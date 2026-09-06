@@ -41,15 +41,17 @@ com.jpbazaar
 
 Externalized properties in `application.yml` bound to environment variables:
 
-| Property | Environment Variable | Default Value | Description |
+| Property | Environment Variable | Config Placeholder | Description |
 |---|---|---|---|
-| Database URL | `DB_URL` | `jdbc:postgresql://localhost:5432/jpbazaar` | PostgreSQL JDBC connection URL |
-| Database User | `DB_USERNAME` | `postgres` | Database username |
-| Database Password | `DB_PASSWORD` | `postgres` | Database password |
-| Redis Host | `REDIS_HOST` | `localhost` | Redis server hostname |
-| Redis Port | `REDIS_PORT` | `6379` | Redis server port |
-| JWT Secret | `JWT_SECRET` | *(64-char Hex Secret)* | HMAC-SHA secret for signing tokens |
-| Active Profile | `SPRING_PROFILES_ACTIVE` | `dev` | Active Spring profile (`dev`, `test`, `prod`) |
+| Database URL | `DB_URL` | `${DB_URL}` | PostgreSQL JDBC connection URL |
+| Database User | `DB_USERNAME` | `${DB_USERNAME}` | Database username |
+| Database Password | `DB_PASSWORD` | `${DB_PASSWORD}` | Database password |
+| Redis Host | `REDIS_HOST` | `${REDIS_HOST}` | Redis server hostname |
+| Redis Port | `REDIS_PORT` | `${REDIS_PORT}` | Redis server port |
+| JWT Secret | `JWT_SECRET` | `${JWT_SECRET}` | HMAC-SHA secret for signing tokens |
+| Active Profile | `SPRING_PROFILES_ACTIVE` | `${SPRING_PROFILES_ACTIVE:dev}` | Active Spring profile (`dev`, `test`, `prod`) |
+
+*Local development environment template provided in `.env.example`. Secret files (`.env`) are excluded from Git via `.gitignore`.*
 
 ---
 
