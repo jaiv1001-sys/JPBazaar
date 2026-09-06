@@ -124,6 +124,58 @@ Implemented 13 JPA entities in `com.jpbazaar.entity`:
 
 ---
 
+## Phase 5 — Authentication & Authorization
+
+### 1. Security Architecture & Features
+- **Stateless JWT Security**: Requests authenticated via `Authorization: Bearer <token>` header.
+- **BCrypt Password Hashing**: Passwords stored as BCrypt hashes (strength 12).
+- **Auto Cart/Wishlist Provisioning**: Registering a customer automatically creates their individual `Cart` and `Wishlist`.
+
+### 2. Implemented Security Components (`com.jpbazaar.security`)
+- **`JwtTokenProvider`**: Generates, signs (HMAC-SHA), parses, and validates JWT tokens with `userId` and `role` claims.
+- **`SecurityUser`**: Adapts `User` entity to Spring Security `UserDetails`.
+- **`CustomUserDetailsService`**: Loads user details from database by email.
+- **`JwtAuthenticationFilter`**: Intercepts requests, validates token, and populates `SecurityContextHolder`.
+- **`SecurityConfig`**: Configures stateless session policy, CORS, public endpoints (`/api/auth/**`, GET `/api/products/**`), and ADMIN role endpoints.
+- **`AuthController`**:
+  - `POST /api/auth/register`
+  - `POST /api/auth/login`
+
+---
+
+## Phase 6 — User Module & Address Book
+
+### 1. Implemented Features
+- **User Profile Management**:
+  - `GET /api/users/me`: Fetch authenticated user profile.
+  - `PUT /api/users/me`: Update first name, last name, and phone.
+  - `PUT /api/users/change-password`: Change password with current password verification.
+- **Address Book Management (CRUD + Default)**:
+  - `POST /api/addresses`: Add new shipping/billing address (auto-sets first address as default).
+  - `GET /api/addresses`: List authenticated user's addresses.
+  - `GET /api/addresses/{id}`: Get address by ID (IDOR protected).
+  - `PUT /api/addresses/{id}`: Update address details (IDOR protected).
+  - `DELETE /api/addresses/{id}`: Delete address (IDOR protected).
+  - `PUT /api/addresses/{id}/set-default`: Set default address for checkout.
+
+### 2. IDOR (Insecure Direct Object Reference) Protection Strategy
+To prevent malicious customers from tampering with URL IDs (e.g., trying `GET /api/addresses/10` to view another user's address), every address operation executes an explicit ownership check:
+
+```java
+private Address getAddressAndValidateOwnership(String email, Long addressId) {
+    Address address = addressRepository.findById(addressId)
+            .orElseThrow(() -> new ResourceNotFoundException("Address not found with ID: " + addressId));
+
+    if (!address.getUser().getEmail().equals(email)) {
+        throw new UnauthorizedException("Access denied: You do not own address ID " + addressId);
+    }
+    return address;
+}
+```
+If the authenticated user's email does not match the resource owner's email, the application throws `UnauthorizedException`, returning HTTP 403 Forbidden.
+
+---
+
 ## Architecture & Layered Responsibilities Explanation
 
 | Layer | Responsibility | Why Separated? |
@@ -136,16 +188,13 @@ Implemented 13 JPA entities in `com.jpbazaar.entity`:
 
 ---
 
-## Interview Preparation — Phase 4 Key Technical Questions
+## Interview Preparation — Phase 6 Key Technical Questions
 
-### Q1: What is the N+1 select query problem in JPA and how did you solve it?
-**Answer**: When loading an entity with lazy child associations (e.g. `Cart -> CartItems`), accessing child items triggers 1 initial SELECT query for the parent Cart, followed by N separate SELECT queries for each child CartItem. We solved this using **JPQL `FETCH JOIN`** queries (e.g. `SELECT c FROM Cart c LEFT JOIN FETCH c.items i LEFT JOIN FETCH i.product WHERE c.user.id = :userId`), executing a single SQL join query to retrieve all data upfront.
+### Q1: What is IDOR (Insecure Direct Object Reference) and how is it mitigated in JPBazaar?
+**Answer**: IDOR occurs when an application exposes a reference to an internal implementation object (like an integer ID in a URL `/api/addresses/5`), allowing an attacker to manipulate the parameter to access unauthorized data. We mitigate IDOR by enforcing contextual ownership checks in `AddressServiceImpl` and JPQL queries (`findByIdAndUserId`), ensuring the authenticated principal owns the requested resource before returning data.
 
-### Q2: Why use `Pageable` and `Page<T>` for product search instead of returning a `List<T>`?
-**Answer**: Returning a full `List<T>` when querying large product catalogs (e.g. 100,000 items) loads massive result sets into JVM memory, leading to high latency and `OutOfMemoryError`. `Pageable` injects SQL `LIMIT` and `OFFSET` clauses, returning only the requested slice of data alongside metadata (total elements, total pages).
+### Q2: Why pass `@AuthenticationPrincipal UserDetails userDetails` to controllers instead of accepting `Long userId` as a `@PathVariable` or `@RequestParam`?
+**Answer**: Accepting `userId` in parameters allows malicious users to send someone else's ID. Relying on `@AuthenticationPrincipal` retrieves the user's identity directly from the cryptographically verified JWT token inside `SecurityContextHolder`, eliminating parameter tampering attacks.
 
-### Q3: Why avoid Native SQL queries in favor of JPQL or Spring Data Derived Methods?
-**Answer**: JPQL queries operate on Java Domain Entities rather than raw database table names, making queries database-agnostic (portable across PostgreSQL, H2, Oracle). Native SQL queries bypass Hibernate entity cache and introduce dialect-locking risk.
-
-### Q4: How do database indexes optimize derived query methods like `findByEmail(String email)`?
-**Answer**: B-tree indexes created on high-cardinality search columns (`users(email)`, `products(sku)`, `products(active, price)`) reduce lookups from O(N) full table scans to O(log N) index traversal searches, ensuring sub-millisecond query execution.
+### Q3: How do you handle setting a new Default Address when another address is already marked as default?
+**Answer**: In `AddressServiceImpl`, when `isDefault = true` is passed, the service queries `findByUserIdAndIsDefaultTrue(userId)` within an `@Transactional` block, unsets the previous default address (`isDefault = false`), and marks the target address as default.
