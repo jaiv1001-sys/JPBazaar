@@ -35,8 +35,8 @@ class AddressControllerTest {
 
     @BeforeEach
     void setUp() throws Exception {
-        user1Token = registerAndGetToken("User1", "One", "user1@example.com", "password123");
-        user2Token = registerAndGetToken("User2", "Two", "user2@example.com", "password123");
+        user1Token = registerAndGetToken("User1", "One", "user1_" + System.nanoTime() + "@example.com", "password123");
+        user2Token = registerAndGetToken("User2", "Two", "user2_" + System.nanoTime() + "@example.com", "password123");
     }
 
     private String registerAndGetToken(String firstName, String lastName, String email, String password) throws Exception {

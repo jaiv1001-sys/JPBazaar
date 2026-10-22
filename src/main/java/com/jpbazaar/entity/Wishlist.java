@@ -47,4 +47,11 @@ public class Wishlist {
         items.remove(item);
         item.setWishlist(null);
     }
+
+    public void clearItems() {
+        for (WishlistItem item : items) {
+            item.setWishlist(null);
+        }
+        items.clear();
+    }
 }

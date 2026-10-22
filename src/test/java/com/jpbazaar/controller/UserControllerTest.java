@@ -31,10 +31,15 @@ class UserControllerTest {
     @Autowired
     private ObjectMapper objectMapper;
 
+    @Autowired
+    private com.jpbazaar.repository.UserRepository userRepository;
+
     private String jwtToken;
 
     @BeforeEach
     void setUp() throws Exception {
+        userRepository.findByEmail("alice.smith@example.com").ifPresent(userRepository::delete);
+
         RegisterRequest registerRequest = new RegisterRequest(
                 "Alice",
                 "Smith",

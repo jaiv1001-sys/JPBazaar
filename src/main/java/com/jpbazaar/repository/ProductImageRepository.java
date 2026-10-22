@@ -10,4 +10,10 @@ import java.util.List;
 public interface ProductImageRepository extends JpaRepository<ProductImage, Long> {
 
     List<ProductImage> findByProductId(Long productId);
+
+    List<ProductImage> findByProductIdOrderByIsPrimaryDescIdAsc(Long productId);
+
+    java.util.Optional<ProductImage> findByIdAndProductId(Long id, Long productId);
+
+    java.util.Optional<ProductImage> findByProductIdAndIsPrimaryTrue(Long productId);
 }

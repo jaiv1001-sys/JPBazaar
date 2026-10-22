@@ -75,12 +75,26 @@ http://localhost:8080/swagger-ui.html
 
 ---
 
-## 📚 Completed Development Roadmap
-
 - [x] **Phase 0**: Project Planning & System Architecture Blueprint
 - [x] **Phase 1**: Database Architecture & PostgreSQL Schema (`sql/schema.sql`)
 - [x] **Phase 2**: Spring Boot 3 Foundation & Environment Setup (`com.jpbazaar`)
-- [ ] **Phase 3**: JPA Entity Layer & Annotations
-- [ ] **Phase 4**: Spring Data JPA Repositories
-- [ ] **Phase 5**: Authentication & Authorization (JWT)
-- [ ] ... *(Phases 6 - 28)*
+- [x] **Phase 3**: JPA Entity Layer & Annotations
+- [x] **Phase 4**: Spring Data JPA Repositories
+- [x] **Phase 5**: Authentication & Authorization (JWT)
+- [x] **Phase 6**: User Module & Address Book (IDOR Protection)
+- [x] **Phase 7**: Product and Category Module (Search, Filter, Pagination)
+- [x] **Phase 8**: Product Images (Pluggable Storage Abstraction, Upload, Primary Designation)
+- [x] **Phase 9**: Cart Module (Add, Update, Remove, Clear, Merge Duplicates, Stock & Inactive Validation)
+- [x] **Phase 10**: Wishlist Module (Add, Remove, Clear, Duplicate Detection, N+1 Fetch Joins)
+- [ ] **Phase 11**: Order Module
+- [ ] **Phase 12**: Payment Module
+- [ ] **Phase 13**: Product Review Module
+- [ ] **Phase 14**: Admin Dashboard & Analytics Module
+- [ ] **Phase 15**: Inventory Management Module
+- [ ] **Phase 16**: Caching with Redis
+- [ ] **Phase 17**: Global Exception Handling & Input Validation
+- [ ] **Phase 18**: OpenAPI / Swagger Documentation
+- [ ] **Phase 19**: Security Hardening & Rate Limiting
+- [ ] **Phase 20**: Dockerization & Deployment
+- [ ] **Phase 21**: Comprehensive Testing Suite
+- [ ] **Phase 22**: Production Readiness & Documentation

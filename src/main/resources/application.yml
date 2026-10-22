@@ -46,6 +46,10 @@ jwt:
   secret: ${JWT_SECRET}
   expiration-ms: ${JWT_EXPIRATION_MS:86400000} # 24 Hours in Milliseconds
 
+app:
+  upload:
+    dir: ${UPLOAD_DIR:uploads/images}
+
 springdoc:
   api-docs:
     path: /v3/api-docs

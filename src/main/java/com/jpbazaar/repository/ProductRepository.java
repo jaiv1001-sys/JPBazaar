@@ -18,6 +18,10 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 
     boolean existsBySku(String sku);
 
+    boolean existsBySkuAndIdNot(String sku, Long id);
+
+    boolean existsByCategoryId(Long categoryId);
+
     Page<Product> findByCategoryIdAndActiveTrue(Long categoryId, Pageable pageable);
 
     @Query("""
