@@ -9,6 +9,9 @@ import com.jpbazaar.exception.ResourceNotFoundException;
 import com.jpbazaar.repository.CategoryRepository;
 import com.jpbazaar.repository.ProductRepository;
 import com.jpbazaar.service.CategoryService;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,6 +30,7 @@ public class CategoryServiceImpl implements CategoryService {
 
     @Override
     @Transactional
+    @CacheEvict(value = "categories", allEntries = true)
     public CategoryResponse createCategory(CategoryRequest request) {
         if (categoryRepository.existsByName(request.name())) {
             throw new DuplicateResourceException("Category already exists with name: " + request.name());
@@ -43,6 +47,7 @@ public class CategoryServiceImpl implements CategoryService {
 
     @Override
     @Transactional(readOnly = true)
+    @Cacheable(value = "category", key = "#id")
     public CategoryResponse getCategoryById(Long id) {
         Category category = getCategoryOrThrow(id);
         return mapToCategoryResponse(category);
@@ -50,6 +55,7 @@ public class CategoryServiceImpl implements CategoryService {
 
     @Override
     @Transactional(readOnly = true)
+    @Cacheable(value = "categories", key = "'all'")
     public List<CategoryResponse> getAllCategories() {
         return categoryRepository.findAll()
                 .stream()
@@ -59,6 +65,10 @@ public class CategoryServiceImpl implements CategoryService {
 
     @Override
     @Transactional
+    @Caching(evict = {
+            @CacheEvict(value = "category", key = "#id"),
+            @CacheEvict(value = "categories", allEntries = true)
+    })
     public CategoryResponse updateCategory(Long id, CategoryRequest request) {
         Category category = getCategoryOrThrow(id);
 
@@ -75,6 +85,10 @@ public class CategoryServiceImpl implements CategoryService {
 
     @Override
     @Transactional
+    @Caching(evict = {
+            @CacheEvict(value = "category", key = "#id"),
+            @CacheEvict(value = "categories", allEntries = true)
+    })
     public void deleteCategory(Long id) {
         Category category = getCategoryOrThrow(id);
 

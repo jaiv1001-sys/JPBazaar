@@ -1,5 +1,6 @@
 package com.jpbazaar.dto.response;
 
+import java.io.Serializable;
 import java.time.OffsetDateTime;
 
 public record CategoryResponse(
@@ -7,4 +8,4 @@ public record CategoryResponse(
         String name,
         String description,
         OffsetDateTime createdAt
-) {}
+) implements Serializable {}

@@ -14,6 +14,8 @@ import com.jpbazaar.repository.CategoryRepository;
 import com.jpbazaar.repository.OrderItemRepository;
 import com.jpbazaar.repository.ProductRepository;
 import com.jpbazaar.service.ProductService;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -67,6 +69,7 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     @Transactional(readOnly = true)
+    @Cacheable(value = "products", key = "#id")
     public ProductResponse getProductById(Long id) {
         Product product = getProductOrThrow(id);
         return mapToProductResponse(product);
@@ -97,6 +100,7 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     @Transactional
+    @CacheEvict(value = "products", key = "#id")
     public ProductResponse updateProduct(Long id, ProductUpdateRequest request) {
         Product product = getProductOrThrow(id);
 
@@ -131,6 +135,7 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     @Transactional
+    @CacheEvict(value = "products", key = "#id")
     public void deleteProduct(Long id) {
         Product product = getProductOrThrow(id);
 

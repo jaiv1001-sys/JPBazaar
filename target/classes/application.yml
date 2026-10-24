@@ -29,6 +29,12 @@ spring:
         order_inserts: true
         order_updates: true
 
+  cache:
+    type: ${CACHE_TYPE:redis}
+    redis:
+      time-to-live: 600000 # 10 minutes in ms
+      cache-null-values: false
+
   data:
     redis:
       host: ${REDIS_HOST}

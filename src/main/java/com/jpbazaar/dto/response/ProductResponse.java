@@ -1,5 +1,6 @@
 package com.jpbazaar.dto.response;
 
+import java.io.Serializable;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -19,4 +20,4 @@ public record ProductResponse(
         List<String> imageUrls,
         OffsetDateTime createdAt,
         OffsetDateTime updatedAt
-) {}
+) implements Serializable {}

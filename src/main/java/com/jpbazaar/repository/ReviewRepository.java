@@ -14,12 +14,15 @@ import java.util.Optional;
 @Repository
 public interface ReviewRepository extends JpaRepository<Review, Long> {
 
+    @Query("SELECT r FROM Review r LEFT JOIN FETCH r.user WHERE r.product.id = :productId")
+    Page<Review> findByProductIdWithUser(@Param("productId") Long productId, Pageable pageable);
+
     Page<Review> findByProductId(Long productId, Pageable pageable);
 
     Optional<Review> findByUserIdAndProductId(Long userId, Long productId);
 
     boolean existsByUserIdAndProductId(Long userId, Long productId);
 
-    @Query("SELECT COALESCE(AVG(r.rating), 0.0) FROM Review r WHERE r.product.id = :productId")
-    BigDecimal findAverageRatingByProductId(@Param("productId") Long productId);
+    @Query("SELECT COALESCE(AVG(CAST(r.rating as double)), 0.0) FROM Review r WHERE r.product.id = :productId")
+    Double calculateAverageRatingByProductId(@Param("productId") Long productId);
 }

@@ -9,6 +9,7 @@ import com.jpbazaar.repository.ProductImageRepository;
 import com.jpbazaar.repository.ProductRepository;
 import com.jpbazaar.service.ProductImageService;
 import com.jpbazaar.service.storage.ImageStorageService;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -34,6 +35,7 @@ public class ProductImageServiceImpl implements ProductImageService {
     }
 
     @Override
+    @CacheEvict(value = "products", key = "#productId")
     public ProductImageResponse addImage(Long productId, ProductImageRequest request) {
         Product product = getProductOrThrow(productId);
 
@@ -55,6 +57,7 @@ public class ProductImageServiceImpl implements ProductImageService {
     }
 
     @Override
+    @CacheEvict(value = "products", key = "#productId")
     public ProductImageResponse uploadImage(Long productId, MultipartFile file, boolean isPrimary) {
         Product product = getProductOrThrow(productId);
 
@@ -90,6 +93,7 @@ public class ProductImageServiceImpl implements ProductImageService {
     }
 
     @Override
+    @CacheEvict(value = "products", key = "#productId")
     public ProductImageResponse setPrimaryImage(Long productId, Long imageId) {
         getProductOrThrow(productId);
 
@@ -106,6 +110,7 @@ public class ProductImageServiceImpl implements ProductImageService {
     }
 
     @Override
+    @CacheEvict(value = "products", key = "#productId")
     public void deleteProductImage(Long productId, Long imageId) {
         getProductOrThrow(productId);
 

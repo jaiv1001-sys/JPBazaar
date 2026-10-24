@@ -41,6 +41,8 @@ public class SecurityConfig {
 
                         // Admin Only Endpoints
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/orders/*/status").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/payments/orders/*/refund").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/products/**", "/api/categories/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/api/products/**", "/api/categories/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/api/products/**", "/api/categories/**").hasRole("ADMIN")

@@ -86,15 +86,15 @@ http://localhost:8080/swagger-ui.html
 - [x] **Phase 8**: Product Images (Pluggable Storage Abstraction, Upload, Primary Designation)
 - [x] **Phase 9**: Cart Module (Add, Update, Remove, Clear, Merge Duplicates, Stock & Inactive Validation)
 - [x] **Phase 10**: Wishlist Module (Add, Remove, Clear, Duplicate Detection, N+1 Fetch Joins)
-- [ ] **Phase 11**: Order Module
-- [ ] **Phase 12**: Payment Module
-- [ ] **Phase 13**: Product Review Module
-- [ ] **Phase 14**: Admin Dashboard & Analytics Module
-- [ ] **Phase 15**: Inventory Management Module
-- [ ] **Phase 16**: Caching with Redis
-- [ ] **Phase 17**: Global Exception Handling & Input Validation
-- [ ] **Phase 18**: OpenAPI / Swagger Documentation
-- [ ] **Phase 19**: Security Hardening & Rate Limiting
-- [ ] **Phase 20**: Dockerization & Deployment
-- [ ] **Phase 21**: Comprehensive Testing Suite
+- [x] **Phase 11**: Order Module (Checkout, Lifecycle State Machine, Historical Price Snapshotting, Stock Management, IDOR Defense)
+- [x] **Phase 12**: Payment Module & Transaction Management (ACID Rollback Pipeline, Pluggable PaymentGateway, Card/UPI/NetBanking/COD, Refunds)
+- [x] **Phase 13**: Concurrency and Inventory Control (Pessimistic Locking `SELECT ... FOR UPDATE`, Deadlock Prevention, Multi-Threaded Stress Testing)
+- [x] **Phase 14**: Verified Buyer Review & Rating System (Verified Buyer Guard, One Review Per Product, Auto Average Recalculation, IDOR Defense)
+- [x] **Phase 15**: Global Exception Handling & Input Validation (Standardized `ApiResponse`, Custom Exception Hierarchy, Bean Validation Audit, SLF4J Diagnostic Logging, Zero Stack Trace Leakage)
+- [x] **Phase 16**: Caching with Redis & Cache Invalidation (Spring Cache Abstraction, RedisTemplate, Jackson JSON Serialization, Dynamic TTLs, Automated Invalidation across Products, Categories, Images, Reviews, and Inventory Deductions)
+- [ ] **Phase 17**: OpenAPI / Swagger Documentation
+- [ ] **Phase 18**: Admin Analytics Dashboard
+- [ ] **Phase 19**: Performance Optimization (Indexes, Query Tuning)
+- [ ] **Phase 20**: Security Hardening & Rate Limiting
+- [ ] **Phase 21**: Dockerization & Multi-Container Deployment
 - [ ] **Phase 22**: Production Readiness & Documentation
