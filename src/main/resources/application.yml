@@ -7,9 +7,9 @@ spring:
     timeout-per-shutdown-phase: 30s
 
   datasource:
-    url: ${DB_URL}
-    username: ${DB_USERNAME}
-    password: ${DB_PASSWORD}
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/jpbazaar}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:postgres}
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: 10
@@ -40,8 +40,8 @@ spring:
 
   data:
     redis:
-      host: ${REDIS_HOST}
-      port: ${REDIS_PORT}
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:}
       timeout: 2000ms
 
@@ -85,7 +85,7 @@ info:
     version: 1.0.0
 
 jwt:
-  secret: ${JWT_SECRET}
+  secret: ${JWT_SECRET:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
   expiration-ms: ${JWT_EXPIRATION_MS:86400000} # 24 Hours in Milliseconds
 
 app:
