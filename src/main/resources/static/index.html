@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>JPBazaar — Next-Gen Curated Marketplace</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚡</text></svg>">
+</head>
+<body>
+
+  <!-- Top Announcement Bar -->
+  <div class="announcement-bar">
+    ✨ Free Express Shipping on orders over $150 | Production Spring Boot 3 & Java 21 REST API Engine
+  </div>
+
+  <!-- Primary Sticky Navbar -->
+  <header class="navbar">
+    <div class="nav-container">
+      <a href="/" class="brand-logo">
+        <span>⚡ JPBazaar</span>
+        <span class="brand-badge">PROD</span>
+      </a>
+
+      <!-- Search Input -->
+      <div class="nav-search">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="navSearchInput" class="search-input" placeholder="Search premium electronics, fashion, audio..." />
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="nav-actions">
+        <!-- Admin Dashboard Button (Admin Only) -->
+        <button id="btnAdminNav" class="nav-btn" onclick="openAdminModal()" style="display: none;">
+          <span>📊 Admin</span>
+        </button>
+
+        <!-- Wishlist Button -->
+        <button class="nav-btn" onclick="openAuthModal('login')" title="Wishlist">
+          <span>♡</span>
+          <span id="wishlistCountBadge" class="badge">0</span>
+        </button>
+
+        <!-- Cart Button -->
+        <button class="nav-btn primary" onclick="toggleCartDrawer()">
+          <span>🛒 Cart</span>
+          <span id="cartCountBadge" class="badge">0</span>
+        </button>
+
+        <!-- Auth / User Container -->
+        <div id="authNavContainer">
+          <button class="nav-btn primary" onclick="openAuthModal('login')">Sign In</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Hero Banner -->
+  <section class="hero-section">
+    <div class="hero-container">
+      <div>
+        <div class="hero-tag">
+          <span>🚀 Spring Boot 3.3.4 • Java 21 • Redis 7 • PostgreSQL 16</span>
+        </div>
+        <h1 class="hero-title">Curated Marketplace for Discerning Tastes</h1>
+        <p class="hero-subtitle">
+          Experience ultra-responsive shopping powered by distributed Redis caching, optimistic locking, and high-performance full-stack architecture.
+        </p>
+        <div class="hero-cta">
+          <a href="#catalog" class="btn-hero btn-hero-primary">Browse Catalog</a>
+          <a href="/swagger-ui/index.html" target="_blank" class="btn-hero btn-hero-secondary">Explore OpenAPI Swagger ↗</a>
+        </div>
+      </div>
+
+      <!-- Live Metric Stats -->
+      <div class="hero-stats">
+        <div class="hero-stat-card">
+          <div class="hero-stat-num">100%</div>
+          <div class="hero-stat-label">Stateless JWT</div>
+        </div>
+        <div class="hero-stat-card">
+          <div class="hero-stat-num">&lt;5ms</div>
+          <div class="hero-stat-label">Cache Latency</div>
+        </div>
+        <div class="hero-stat-card">
+          <div class="hero-stat-num">Zero</div>
+          <div class="hero-stat-label">N+1 Queries</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Main Storefront Catalog -->
+  <main id="catalog">
+    <!-- Category & Sort Controls -->
+    <div class="category-filter-section">
+      <div id="categoryPills" class="category-pills">
+        <button class="cat-pill active">All Products</button>
+      </div>
+
+      <div>
+        <select id="catalogSortSelect" class="sort-select">
+          <option value="featured">Sort by: Featured</option>
+          <option value="price-low">Price: Low to High</option>
+          <option value="price-high">Price: High to Low</option>
+          <option value="rating">Highest Rated</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Product Grid -->
+    <section class="catalog-section">
+      <div id="productGrid" class="product-grid">
+        <!-- Injected dynamically by app.js -->
+        <div style="grid-column: 1/-1; text-align: center; padding: 48px;">
+          <p style="color: var(--gray-500);">Loading curated catalog...</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Slide-Over Shopping Cart Drawer -->
+  <div id="cartDrawerBackdrop" class="drawer-backdrop" onclick="toggleCartDrawer()">
+    <div class="drawer-panel" onclick="event.stopPropagation()">
+      <div class="drawer-header">
+        <h3 class="drawer-title">
+          <span>🛒</span> Shopping Cart
+        </h3>
+        <button class="drawer-close" onclick="toggleCartDrawer()">✕</button>
+      </div>
+
+      <div id="cartItemsContainer" class="drawer-body">
+        <!-- Rendered by app.js -->
+      </div>
+
+      <div class="drawer-footer">
+        <div class="cart-summary-line">
+          <span>Subtotal</span>
+          <span id="cartSubtotal">$0.00</span>
+        </div>
+        <div class="cart-summary-line">
+          <span>Estimated Shipping</span>
+          <span style="color: var(--success); font-weight: 600;">FREE</span>
+        </div>
+        <div class="cart-summary-total">
+          <span>Total</span>
+          <span id="cartTotal">$0.00</span>
+        </div>
+        <button class="btn-checkout" onclick="proceedToCheckout()">
+          <span>Proceed to Checkout →</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Product Details Modal -->
+  <div id="productModalBackdrop" class="modal-backdrop" onclick="closeAllModals()">
+    <div class="modal-card" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <h4 class="modal-title">Product Details</h4>
+        <button class="drawer-close" onclick="closeAllModals()">✕</button>
+      </div>
+      <div id="productModalBody" class="modal-body">
+        <!-- Dynamic -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Checkout Modal -->
+  <div id="checkoutModalBackdrop" class="modal-backdrop" onclick="closeAllModals()">
+    <div class="modal-card" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <h4 class="modal-title">Complete Your Order</h4>
+        <button class="drawer-close" onclick="closeAllModals()">✕</button>
+      </div>
+      <div class="modal-body">
+        <form id="checkoutForm">
+          <h5 style="font-weight: 700; margin-bottom: 12px; color: var(--dark);">1. Delivery Address</h5>
+          <div class="form-group">
+            <label class="form-label">Street Address</label>
+            <input type="text" id="chkAddress" class="form-input" value="742 Evergreen Terrace" required />
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">City</label>
+              <input type="text" id="chkCity" class="form-input" value="Springfield" required />
+            </div>
+            <div class="form-group">
+              <label class="form-label">State / Province</label>
+              <input type="text" id="chkState" class="form-input" value="Oregon" required />
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Postal Code</label>
+              <input type="text" id="chkZip" class="form-input" value="97477" required />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Country</label>
+              <input type="text" id="chkCountry" class="form-input" value="United States" required />
+            </div>
+          </div>
+
+          <h5 style="font-weight: 700; margin: 20px 0 12px; color: var(--dark);">2. Payment Method</h5>
+          <div class="form-group">
+            <select id="chkPaymentMethod" class="form-select">
+              <option value="CARD">Credit / Debit Card (Simulated)</option>
+              <option value="UPI">UPI Instant Pay</option>
+              <option value="NET_BANKING">Net Banking</option>
+              <option value="COD">Cash on Delivery (COD)</option>
+            </select>
+          </div>
+
+          <button type="submit" class="btn-form-submit" style="margin-top: 16px;">
+            <span>Authorize & Confirm Order</span>
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Order Success Modal -->
+  <div id="successModalBackdrop" class="modal-backdrop" onclick="closeAllModals()">
+    <div class="modal-card" style="text-align: center;" onclick="event.stopPropagation()">
+      <div class="modal-body" style="padding: 40px 24px;">
+        <div style="font-size: 3.5rem; margin-bottom: 12px;">🎉</div>
+        <h3 style="font-size: 1.5rem; font-weight: 800; color: var(--dark); margin-bottom: 8px;">Order Placed Successfully!</h3>
+        <p style="color: var(--gray-600); margin-bottom: 20px;">Thank you for your purchase with JPBazaar.</p>
+        <div style="background: var(--gray-50); padding: 16px; border-radius: var(--radius-md); margin-bottom: 24px; font-size: 0.9375rem;">
+          <p>Order Reference: <strong id="successOrderNum" style="color: var(--primary);">#0</strong></p>
+          <p>Total Charged: <strong id="successOrderTotal">$0.00</strong></p>
+        </div>
+        <button class="btn-checkout" onclick="closeAllModals()">Continue Shopping</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Auth Modal (Sign In / Register) -->
+  <div id="authModalBackdrop" class="modal-backdrop" onclick="closeAllModals()">
+    <div class="modal-card" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <div style="display: flex; gap: 16px;">
+          <button id="tabLogin" class="cat-pill active" onclick="switchAuthTab('login')">Sign In</button>
+          <button id="tabRegister" class="cat-pill" onclick="switchAuthTab('register')">Create Account</button>
+        </div>
+        <button class="drawer-close" onclick="closeAllModals()">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <!-- Sign In Form -->
+        <form id="loginForm">
+          <div class="form-group">
+            <label class="form-label">Email Address</label>
+            <input type="email" id="loginEmail" class="form-input" placeholder="you@example.com" required />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Password</label>
+            <input type="password" id="loginPassword" class="form-input" placeholder="••••••••" required />
+          </div>
+          <button type="submit" class="btn-form-submit">Sign In to JPBazaar</button>
+
+          <!-- Quick Fill Demo Accounts -->
+          <div class="demo-account-pills">
+            <button type="button" class="demo-pill" onclick="quickFillDemo('customer')">⚡ Fill Demo Customer</button>
+            <button type="button" class="demo-pill" onclick="quickFillDemo('admin')">🛡️ Fill Demo Admin</button>
+          </div>
+        </form>
+
+        <!-- Register Form -->
+        <form id="registerForm" style="display: none;">
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">First Name</label>
+              <input type="text" id="regFirstName" class="form-input" required />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Last Name</label>
+              <input type="text" id="regLastName" class="form-input" required />
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Email Address</label>
+            <input type="email" id="regEmail" class="form-input" required />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Phone Number</label>
+            <input type="text" id="regPhone" class="form-input" placeholder="+1-555-0100" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Password</label>
+            <input type="password" id="regPassword" class="form-input" placeholder="At least 8 chars" required />
+          </div>
+          <button type="submit" class="btn-form-submit">Create Free Account</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- User Profile & Order History Modal -->
+  <div id="profileModalBackdrop" class="modal-backdrop" onclick="closeAllModals()">
+    <div class="modal-card" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <h4 class="modal-title">My Account</h4>
+        <button class="drawer-close" onclick="closeAllModals()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div style="margin-bottom: 20px;">
+          <h4 id="profileUserName" style="font-weight: 800; color: var(--dark);">User Name</h4>
+          <p id="profileUserEmail" style="color: var(--gray-600); font-size: 0.875rem;">user@example.com</p>
+          <span id="profileUserRole" class="brand-badge" style="margin-top: 6px; display: inline-block;">CUSTOMER</span>
+        </div>
+
+        <h5 style="font-weight: 700; color: var(--dark); margin-bottom: 12px;">Recent Orders</h5>
+        <div id="profileOrdersContainer">
+          <p style="color: var(--gray-500); font-size: 0.875rem;">Loading orders...</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Admin Dashboard Modal -->
+  <div id="adminModalBackdrop" class="modal-backdrop" onclick="closeAllModals()">
+    <div class="modal-card" style="max-width: 680px;" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <h4 class="modal-title">📊 Executive Analytics Dashboard</h4>
+        <button class="drawer-close" onclick="closeAllModals()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="admin-stats-grid">
+          <div class="admin-kpi-card">
+            <div class="admin-kpi-title">Total Revenue</div>
+            <div id="admTotalRev" class="admin-kpi-val">$0.00</div>
+          </div>
+          <div class="admin-kpi-card">
+            <div class="admin-kpi-title">Total Orders</div>
+            <div id="admTotalOrders" class="admin-kpi-val">0</div>
+          </div>
+          <div class="admin-kpi-card">
+            <div class="admin-kpi-title">Active Users</div>
+            <div id="admActiveUsers" class="admin-kpi-val">0</div>
+          </div>
+          <div class="admin-kpi-card">
+            <div class="admin-kpi-title">Low Stock Alert</div>
+            <div id="admLowStock" class="admin-kpi-val" style="color: var(--danger);">0</div>
+          </div>
+        </div>
+
+        <div style="background: var(--gray-50); padding: 16px; border-radius: var(--radius-md); border: 1px solid var(--gray-200);">
+          <h5 style="font-weight: 700; margin-bottom: 8px;">Admin Fast Actions</h5>
+          <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+            <a href="/swagger-ui/index.html" target="_blank" class="nav-btn primary" style="text-decoration: none;">Interactive Swagger API</a>
+            <a href="/actuator/health" target="_blank" class="nav-btn" style="text-decoration: none;">Actuator Health</a>
+            <a href="/actuator/prometheus" target="_blank" class="nav-btn" style="text-decoration: none;">Prometheus Metrics</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toastContainer" class="toast-container"></div>
+
+  <!-- App Script -->
+  <script src="/js/app.js"></script>
+</body>
+</html>

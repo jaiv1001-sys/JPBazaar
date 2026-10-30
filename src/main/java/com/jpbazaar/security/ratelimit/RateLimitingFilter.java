@@ -91,7 +91,13 @@ public class RateLimitingFilter extends OncePerRequestFilter {
 
     private boolean isBypassed(HttpServletRequest request) {
         String uri = request.getRequestURI();
-        return uri.startsWith("/api/v1/health")
+        return uri.equals("/")
+                || uri.equals("/index.html")
+                || uri.startsWith("/css")
+                || uri.startsWith("/js")
+                || uri.startsWith("/images")
+                || uri.startsWith("/static")
+                || uri.startsWith("/api/v1/health")
                 || uri.startsWith("/actuator")
                 || uri.startsWith("/swagger-ui")
                 || uri.startsWith("/v3/api-docs")
