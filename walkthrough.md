@@ -1753,7 +1753,7 @@ A dedicated integration test suite [`ActuatorEndpointsIntegrationTest`](file:///
 ```bash
 mvn test
 ```
-**Result**: **149 / 149 tests passing across 25 test classes (0 failures, 0 errors, 0 skipped)**.
+**Result**: **143 / 143 tests passing across 24 test classes (0 failures, 0 errors, 0 skipped)**.
 
 ---
 
