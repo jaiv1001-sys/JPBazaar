@@ -1,0 +1,58 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-luxury-black text-luxury-white font-sans antialiased overflow-x-hidden;
+  }
+
+  /* Custom Luxury Scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #080808;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #2a2a2a;
+    border-radius: 9999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #D4AF37;
+  }
+}
+
+@layer components {
+  /* Editorial Luxury Typography */
+  .heading-hero {
+    @apply font-serif text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-luxury-white leading-tight;
+  }
+  
+  .heading-section {
+    @apply font-serif text-2xl sm:text-3xl lg:text-4xl font-bold text-luxury-white tracking-tight;
+  }
+
+  .subheading-gold {
+    @apply text-xs sm:text-sm font-semibold tracking-luxury-wide uppercase text-luxury-gold;
+  }
+
+  /* Luxury Glassmorphism */
+  .glass-dark {
+    @apply bg-luxury-black/85 backdrop-blur-md border border-luxury-border;
+  }
+
+  .glass-surface {
+    @apply bg-luxury-surface/90 backdrop-blur-md border border-luxury-border;
+  }
+
+  .glass-gold {
+    @apply bg-luxury-gold/10 backdrop-blur-sm border border-luxury-gold/30 text-luxury-gold;
+  }
+
+  /* Ivory Surfaces for High-Clarity Product Details */
+  .surface-ivory {
+    @apply bg-luxury-ivory text-luxury-black;
+  }
+}

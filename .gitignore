@@ -21,3 +21,11 @@ target/
 # OS files
 .DS_Store
 Thumbs.db
+
+# Frontend Dependencies & Build Output
+node_modules/
+frontend/node_modules/
+dist/
+frontend/dist/
+.vite/
+
