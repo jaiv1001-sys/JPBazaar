@@ -111,7 +111,8 @@ export interface Product {
   active: boolean;
   categoryId: number;
   categoryName?: string;
-  images: ProductImage[];
+  imageUrls?: string[];
+  images?: ProductImage[];
   createdAt: string;
   updatedAt: string;
 }
@@ -143,8 +144,10 @@ export interface CartItem {
   id: number;
   productId: number;
   productName: string;
-  sku: string;
+  sku?: string;
+  productSku?: string;
   price: number;
+  unitPrice?: number;
   quantity: number;
   subtotal: number;
   imageUrl?: string;
@@ -172,11 +175,13 @@ export interface WishlistItem {
   id: number;
   productId: number;
   productName: string;
+  productSku?: string;
   price: number;
   rating?: number;
   imageUrl?: string;
   inStock: boolean;
-  createdAt: string;
+  addedAt?: string;
+  createdAt?: string;
 }
 
 export interface Wishlist {
@@ -265,14 +270,22 @@ export interface Review {
 }
 
 export interface ReviewRequest {
+  productId?: number;
   rating: number;
   comment?: string;
 }
 
-export interface ReviewSummary {
+export interface ReviewCreateRequest {
+  productId: number;
+  rating: number;
+  comment?: string;
+}
+
+export interface ProductReviewSummaryResponse {
+  productId: number;
   averageRating: number;
   totalReviews: number;
-  ratingDistribution: Record<number, number>;
+  reviews: PageResponse<Review>;
 }
 
 // Admin Dashboard Analytics

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useCart } from '../../context/CartContext';
+import { useWishlist } from '../../context/WishlistContext';
 import { Button } from '../common/Button';
 import {
   ShoppingBag,
@@ -18,6 +19,7 @@ import {
 export const Navbar: React.FC = () => {
   const { user, isAuthenticated, isAdmin, logout } = useAuth();
   const { totalCount, openDrawer } = useCart();
+  const { wishlistCount } = useWishlist();
   const navigate = useNavigate();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -68,17 +70,17 @@ export const Navbar: React.FC = () => {
             <Link to="/products" className="text-luxury-muted hover:text-luxury-gold transition-colors">
               Collections
             </Link>
-            <Link to="/products?category=electronics" className="text-luxury-muted hover:text-luxury-gold transition-colors">
+            <Link to="/products?categoryId=1" className="text-luxury-muted hover:text-luxury-gold transition-colors">
               Computing
             </Link>
-            <Link to="/products?category=audio" className="text-luxury-muted hover:text-luxury-gold transition-colors">
+            <Link to="/products?categoryId=2" className="text-luxury-muted hover:text-luxury-gold transition-colors">
               Acoustics
             </Link>
-            <Link to="/products?category=fashion" className="text-luxury-muted hover:text-luxury-gold transition-colors">
-              Haute Apparel
+            <Link to="/products?categoryId=3" className="text-luxury-muted hover:text-luxury-gold transition-colors">
+              Apparel
             </Link>
-            <Link to="/products?category=home" className="text-luxury-muted hover:text-luxury-gold transition-colors">
-              Maison
+            <Link to="/products?categoryId=4" className="text-luxury-muted hover:text-luxury-gold transition-colors">
+              Living
             </Link>
           </div>
 
@@ -112,6 +114,11 @@ export const Navbar: React.FC = () => {
               title="Saved Wishlist"
             >
               <Heart size={20} />
+              {wishlistCount > 0 && (
+                <span className="absolute -top-1 -right-1 bg-luxury-gold text-luxury-black text-[10px] font-black w-4 h-4 rounded-full flex items-center justify-center shadow-gold-glow animate-fade-in">
+                  {wishlistCount}
+                </span>
+              )}
             </Link>
 
             {/* Shopping Cart Drawer Trigger */}
@@ -218,28 +225,28 @@ export const Navbar: React.FC = () => {
                 All Collections
               </Link>
               <Link
-                to="/products?category=electronics"
+                to="/products?categoryId=1"
                 onClick={() => setIsMobileMenuOpen(false)}
                 className="text-luxury-muted hover:text-luxury-gold"
               >
                 High-Performance Computing
               </Link>
               <Link
-                to="/products?category=audio"
+                to="/products?categoryId=2"
                 onClick={() => setIsMobileMenuOpen(false)}
                 className="text-luxury-muted hover:text-luxury-gold"
               >
                 Precision Acoustics
               </Link>
               <Link
-                to="/products?category=fashion"
+                to="/products?categoryId=3"
                 onClick={() => setIsMobileMenuOpen(false)}
                 className="text-luxury-muted hover:text-luxury-gold"
               >
                 Haute Apparel &amp; Horlogerie
               </Link>
               <Link
-                to="/products?category=home"
+                to="/products?categoryId=4"
                 onClick={() => setIsMobileMenuOpen(false)}
                 className="text-luxury-muted hover:text-luxury-gold"
               >

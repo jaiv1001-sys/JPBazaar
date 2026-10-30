@@ -3,6 +3,7 @@ import { BrowserRouter } from 'react-router-dom';
 import { ToastProvider } from './context/ToastContext';
 import { AuthProvider } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
+import { WishlistProvider } from './context/WishlistContext';
 import { AppRoutes } from './routes/AppRoutes';
 
 export const App: React.FC = () => {
@@ -11,7 +12,9 @@ export const App: React.FC = () => {
       <ToastProvider>
         <AuthProvider>
           <CartProvider>
-            <AppRoutes />
+            <WishlistProvider>
+              <AppRoutes />
+            </WishlistProvider>
           </CartProvider>
         </AuthProvider>
       </ToastProvider>
