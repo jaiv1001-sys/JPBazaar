@@ -15,6 +15,8 @@ const state = {
   user: null,
   token: localStorage.getItem("jpbazaar_token") || null,
   isAdmin: false,
+  savedAddresses: [],
+  selectedAddressId: null,
 };
 
 // API Helper
@@ -29,8 +31,7 @@ const API = {
   async post(url, data, auth = false) {
     const headers = { "Content-Type": "application/json" };
     if (auth && state.token) headers["Authorization"] = `Bearer ${state.token}`;
-    const credentials = { method: "POST", headers, body: JSON.stringify(data) };
-    const res = await fetch(url, credentials);
+    const res = await fetch(url, { method: "POST", headers, body: JSON.stringify(data) });
     return handleResponse(res);
   },
 
@@ -72,7 +73,7 @@ function showToast(message, type = "info") {
   }, 3500);
 }
 
-// Initializer
+// Initialization
 document.addEventListener("DOMContentLoaded", async () => {
   initAuth();
   await loadCategories();
@@ -81,6 +82,15 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (state.token) {
     await syncUserCart();
     await syncUserWishlist();
+  } else {
+    // Load local cart from localStorage if exists
+    const savedLocalCart = localStorage.getItem("jpbazaar_local_cart");
+    if (savedLocalCart) {
+      try {
+        state.cart = JSON.parse(savedLocalCart);
+        renderCart();
+      } catch (e) {}
+    }
   }
 });
 
@@ -105,11 +115,11 @@ function renderAuthNav() {
 
   if (state.user) {
     authContainer.innerHTML = `
-      <button class="nav-btn" onclick="openProfileModal()">
+      <button class="nav-btn" onclick="openProfileModal()" title="View Account & Orders">
         <span>👤 ${escapeHtml(state.user.firstName)}</span>
       </button>
-      <button class="nav-btn" onclick="logout()" title="Logout">
-        <span>🚪</span>
+      <button class="nav-btn" onclick="logout()" title="Sign Out">
+        <span>🚪 Sign Out</span>
       </button>
     `;
     if (state.isAdmin) {
@@ -127,7 +137,7 @@ function renderAuthNav() {
   }
 }
 
-// Categories & Products Loading
+// Category & Product Fetching
 async function loadCategories() {
   try {
     const data = await API.get("/api/categories");
@@ -166,6 +176,7 @@ async function loadProducts() {
 
 function renderProducts() {
   const grid = document.getElementById("productGrid");
+  const countLabel = document.getElementById("catalogCountLabel");
   let filtered = [...state.products];
 
   // Category Filter
@@ -179,11 +190,12 @@ function renderProducts() {
     filtered = filtered.filter(p =>
       p.name.toLowerCase().includes(q) ||
       (p.brand && p.brand.toLowerCase().includes(q)) ||
-      (p.description && p.description.toLowerCase().includes(q))
+      (p.description && p.description.toLowerCase().includes(q)) ||
+      (p.categoryName && p.categoryName.toLowerCase().includes(q))
     );
   }
 
-  // Sort
+  // Sort Filter
   if (state.sortBy === "price-low") {
     filtered.sort((a, b) => a.price - b.price);
   } else if (state.sortBy === "price-high") {
@@ -192,11 +204,17 @@ function renderProducts() {
     filtered.sort((a, b) => (b.rating || 0) - (a.rating || 0));
   }
 
+  if (countLabel) {
+    countLabel.textContent = `Showing ${filtered.length} of ${state.products.length} products`;
+  }
+
   if (filtered.length === 0) {
     grid.innerHTML = `
       <div style="grid-column: 1/-1; text-align: center; padding: 64px 20px;">
-        <h3 style="font-size: 1.25rem; font-weight: 700; color: var(--gray-700); margin-bottom: 8px;">No products match your criteria</h3>
-        <p style="color: var(--gray-500); font-size: 0.9375rem;">Try adjusting your search terms or filters.</p>
+        <div style="font-size: 3rem; margin-bottom: 12px;">🔎</div>
+        <h3 style="font-size: 1.25rem; font-weight: 700; color: var(--gray-700); margin-bottom: 8px;">No matching products found</h3>
+        <p style="color: var(--gray-500); font-size: 0.9375rem; margin-bottom: 16px;">Try adjusting your search terms or category selection.</p>
+        <button class="nav-btn primary" onclick="resetFilters()">Reset All Filters</button>
       </div>
     `;
     return;
@@ -215,7 +233,7 @@ function renderProducts() {
         <div class="card-img-wrapper" onclick="openProductModal(${product.id})">
           <img class="card-img" src="${escapeHtml(primaryImg)}" alt="${escapeHtml(product.name)}" loading="lazy" />
           <span class="card-badge">${inStock ? (product.stockQuantity < 5 ? `Only ${product.stockQuantity} left` : 'In Stock') : 'Sold Out'}</span>
-          <button class="card-wish-btn ${isWished ? 'active' : ''}" onclick="event.stopPropagation(); toggleWishlist(${product.id})" title="Wishlist">
+          <button class="card-wish-btn ${isWished ? 'active' : ''}" onclick="event.stopPropagation(); toggleWishlist(${product.id})" title="Add to Wishlist">
             ${isWished ? '♥' : '♡'}
           </button>
         </div>
@@ -224,9 +242,9 @@ function renderProducts() {
           <h4 class="card-title" onclick="openProductModal(${product.id})">${escapeHtml(product.name)}</h4>
           <div class="card-rating">
             <span class="rating-stars">★</span>
-            <span>${product.rating ? Number(product.rating).toFixed(1) : '5.0'}</span>
+            <span style="font-weight: 700;">${product.rating ? Number(product.rating).toFixed(1) : '5.0'}</span>
             <span style="color: var(--gray-300);">•</span>
-            <span style="color: var(--gray-500); font-size: 0.75rem;">SKU: ${escapeHtml(product.sku)}</span>
+            <span style="color: var(--gray-500); font-size: 0.75rem;">${product.stockQuantity} in stock</span>
           </div>
           <div class="card-footer">
             <span class="card-price">$${Number(product.price).toFixed(2)}</span>
@@ -240,16 +258,24 @@ function renderProducts() {
   }).join("");
 }
 
-// Cart Management
-async function addToCart(productId) {
+function resetFilters() {
+  state.selectedCategory = "ALL";
+  state.searchQuery = "";
+  document.getElementById("navSearchInput").value = "";
+  renderCategoryPills();
+  renderProducts();
+}
+
+// Shopping Cart Actions
+async function addToCart(productId, qty = 1) {
   const product = state.products.find(p => p.id === productId);
   if (!product) return;
 
   if (state.token) {
     try {
-      await API.post("/api/cart/items", { productId, quantity: 1 }, true);
+      await API.post("/api/cart/items", { productId, quantity: qty }, true);
       await syncUserCart();
-      showToast(`Added "${product.name}" to your cart!`, "success");
+      showToast(`Added ${qty > 1 ? qty + 'x ' : ''}"${product.name}" to cart!`, "success");
     } catch (err) {
       showToast(err.message, "error");
     }
@@ -257,7 +283,7 @@ async function addToCart(productId) {
     // Local session cart
     const existing = state.cart.find(i => i.productId === productId);
     if (existing) {
-      existing.quantity += 1;
+      existing.quantity += qty;
     } else {
       const primaryImg = (product.images && product.images.length > 0)
         ? (product.images.find(i => i.isPrimary) || product.images[0]).imageUrl
@@ -268,12 +294,13 @@ async function addToCart(productId) {
         productId: product.id,
         productName: product.name,
         price: product.price,
-        quantity: 1,
+        quantity: qty,
         imageUrl: primaryImg,
       });
     }
+    localStorage.setItem("jpbazaar_local_cart", JSON.stringify(state.cart));
     renderCart();
-    showToast(`Added "${product.name}" to cart!`, "success");
+    showToast(`Added ${qty > 1 ? qty + 'x ' : ''}"${product.name}" to cart!`, "success");
   }
 }
 
@@ -293,6 +320,7 @@ async function updateCartItemQty(itemId, newQty) {
     const item = state.cart.find(i => i.id === itemId);
     if (item) {
       item.quantity = newQty;
+      localStorage.setItem("jpbazaar_local_cart", JSON.stringify(state.cart));
       renderCart();
     }
   }
@@ -309,6 +337,7 @@ async function removeCartItem(itemId) {
     }
   } else {
     state.cart = state.cart.filter(i => i.id !== itemId);
+    localStorage.setItem("jpbazaar_local_cart", JSON.stringify(state.cart));
     renderCart();
     showToast("Item removed", "info");
   }
@@ -318,6 +347,7 @@ async function syncUserCart() {
   try {
     const data = await API.get("/api/cart", true);
     state.cart = data.items || [];
+    localStorage.removeItem("jpbazaar_local_cart");
     renderCart();
   } catch (e) {
     console.error("Cart sync failed:", e);
@@ -340,9 +370,9 @@ function renderCart() {
   if (state.cart.length === 0) {
     cartBody.innerHTML = `
       <div style="text-align: center; padding: 48px 16px; color: var(--gray-500);">
-        <p style="font-size: 2.5rem; margin-bottom: 8px;">🛒</p>
-        <p style="font-weight: 700; color: var(--dark);">Your cart is empty</p>
-        <p style="font-size: 0.875rem;">Discover our premium selection and add items!</p>
+        <p style="font-size: 2.85rem; margin-bottom: 8px;">🛒</p>
+        <p style="font-weight: 700; color: var(--dark); font-size: 1.125rem;">Your cart is empty</p>
+        <p style="font-size: 0.875rem; margin-top: 4px;">Explore our catalog and discover premier items!</p>
       </div>
     `;
     return;
@@ -427,23 +457,32 @@ async function openProductModal(productId) {
   modalBody.innerHTML = `
     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
       <div>
-        <img src="${escapeHtml(primaryImg)}" alt="${escapeHtml(product.name)}" style="width: 100%; border-radius: var(--radius-md); object-fit: cover;" />
+        <img src="${escapeHtml(primaryImg)}" alt="${escapeHtml(product.name)}" style="width: 100%; border-radius: var(--radius-md); object-fit: cover; box-shadow: var(--shadow-md);" />
       </div>
       <div>
-        <span style="font-size: 0.75rem; font-weight: 700; color: var(--primary); text-transform: uppercase;">${escapeHtml(product.brand || 'JPBazaar')}</span>
+        <span style="font-size: 0.75rem; font-weight: 700; color: var(--primary); text-transform: uppercase;">${escapeHtml(product.categoryName || product.brand || 'JPBazaar')}</span>
         <h3 style="font-size: 1.4rem; font-weight: 800; color: var(--dark); margin: 4px 0 8px;">${escapeHtml(product.name)}</h3>
-        <p style="font-size: 1.5rem; font-weight: 800; color: var(--dark); margin-bottom: 12px;">$${Number(product.price).toFixed(2)}</p>
-        <p style="color: var(--gray-700); font-size: 0.875rem; line-height: 1.6; margin-bottom: 20px;">${escapeHtml(product.description || 'No description provided.')}</p>
+        <p style="font-size: 1.6rem; font-weight: 800; color: var(--dark); margin-bottom: 12px;">$${Number(product.price).toFixed(2)}</p>
+        <p style="color: var(--gray-700); font-size: 0.875rem; line-height: 1.6; margin-bottom: 20px;">${escapeHtml(product.description || 'No description available.')}</p>
         
-        <div style="background: var(--gray-50); padding: 12px; border-radius: var(--radius-md); margin-bottom: 20px; font-size: 0.8125rem;">
-          <p><strong>SKU:</strong> ${escapeHtml(product.sku)}</p>
-          <p><strong>Stock Level:</strong> ${product.stockQuantity} units available</p>
+        <div style="background: var(--gray-50); padding: 14px; border-radius: var(--radius-md); margin-bottom: 20px; font-size: 0.8125rem; border: 1px solid var(--gray-200);">
+          <p style="margin-bottom: 4px;"><strong>SKU:</strong> ${escapeHtml(product.sku)}</p>
+          <p style="margin-bottom: 4px;"><strong>Inventory:</strong> ${product.stockQuantity} units available</p>
           <p><strong>Customer Rating:</strong> ⭐ ${product.rating ? Number(product.rating).toFixed(1) : '5.0'} / 5.0</p>
         </div>
 
-        <button class="btn-checkout" onclick="addToCart(${product.id}); closeAllModals();">
-          <span>+ Add to Shopping Cart</span>
-        </button>
+        <div style="display: flex; gap: 12px; align-items: center;">
+          <select id="modalQtySelect" class="form-select" style="width: 80px;">
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+            <option value="5">5</option>
+          </select>
+          <button class="btn-checkout" style="flex: 1;" onclick="addFromModal(${product.id})">
+            <span>+ Add to Shopping Cart</span>
+          </button>
+        </div>
       </div>
     </div>
   `;
@@ -451,100 +490,188 @@ async function openProductModal(productId) {
   modal.classList.add("active");
 }
 
-// Checkout & Orders
-function proceedToCheckout() {
+function addFromModal(productId) {
+  const qty = parseInt(document.getElementById("modalQtySelect").value, 10) || 1;
+  addToCart(productId, qty);
+  closeAllModals();
+}
+
+// Checkout & Payment Execution
+async function proceedToCheckout() {
   if (state.cart.length === 0) {
-    showToast("Your cart is empty!", "error");
+    showToast("Your cart is empty! Add products first.", "error");
     return;
   }
 
   if (!state.token) {
-    showToast("Please sign in to complete your checkout", "info");
+    showToast("Please sign in to proceed to checkout", "info");
     toggleCartDrawer();
     openAuthModal("login");
     return;
   }
 
   toggleCartDrawer();
+  await loadSavedAddresses();
+
+  // Populate checkout summary
+  const subtotal = state.cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  document.getElementById("chkSummaryItems").textContent = `${state.cart.length} item(s)`;
+  document.getElementById("chkSummaryTotal").textContent = `$${subtotal.toFixed(2)}`;
+
   const modal = document.getElementById("checkoutModalBackdrop");
   modal.classList.add("active");
 }
 
-async function handlePlaceOrder(e) {
-  e.preventDefault();
-  const addressLine = document.getElementById("chkAddress").value;
-  const city = document.getElementById("chkCity").value;
-  const stateVal = document.getElementById("chkState").value;
-  const postalCode = document.getElementById("chkZip").value;
-  const country = document.getElementById("chkCountry").value;
-  const paymentMethod = document.getElementById("chkPaymentMethod").value;
-
+async function loadSavedAddresses() {
   try {
-    // 1. Create or ensure delivery address
-    const address = await API.post("/api/addresses", {
-      addressLine,
-      city,
-      state: stateVal,
-      postalCode,
-      country,
-      isDefault: true,
-    }, true);
+    const data = await API.get("/api/addresses", true);
+    state.savedAddresses = Array.isArray(data) ? data : [];
+    const container = document.getElementById("savedAddressesContainer");
 
-    // 2. Create Order
-    const order = await API.post("/api/orders", {
-      addressId: address.id,
-      paymentMethod,
-    }, true);
-
-    // 3. Process Payment
-    await API.post("/api/payments/process", {
-      orderId: order.id,
-      paymentMethod,
-      cardNumber: paymentMethod === "CARD" ? "4111222233334444" : null,
-      expiryMonth: paymentMethod === "CARD" ? "12" : null,
-      expiryYear: paymentMethod === "CARD" ? "2028" : null,
-      cvv: paymentMethod === "CARD" ? "123" : null,
-    }, true);
-
-    closeAllModals();
-    await syncUserCart();
-
-    showToast(`Order #${order.id} placed and confirmed successfully! 🎉`, "success");
-    openOrderSuccessModal(order.id, order.totalAmount);
+    if (state.savedAddresses.length > 0) {
+      state.selectedAddressId = state.savedAddresses[0].id;
+      container.innerHTML = `
+        <div style="margin-bottom: 12px;">
+          <label class="form-label">Select Delivery Address:</label>
+          <select id="selectSavedAddress" class="form-select" onchange="onAddressSelect(this.value)">
+            ${state.savedAddresses.map(a => `
+              <option value="${a.id}">${escapeHtml(a.addressLine)}, ${escapeHtml(a.city)}, ${escapeHtml(a.state)} (${escapeHtml(a.postalCode)})</option>
+            `).join("")}
+            <option value="NEW">+ Enter a New Shipping Address</option>
+          </select>
+        </div>
+      `;
+      document.getElementById("newAddressFields").style.display = "none";
+    } else {
+      state.selectedAddressId = null;
+      container.innerHTML = "";
+      document.getElementById("newAddressFields").style.display = "block";
+    }
   } catch (err) {
-    showToast(err.message, "error");
+    console.error("Failed to load addresses:", err);
   }
 }
 
-function openOrderSuccessModal(orderId, amount) {
+function onAddressSelect(val) {
+  if (val === "NEW") {
+    state.selectedAddressId = null;
+    document.getElementById("newAddressFields").style.display = "block";
+  } else {
+    state.selectedAddressId = Number(val);
+    document.getElementById("newAddressFields").style.display = "none";
+  }
+}
+
+async function handlePlaceOrder(e) {
+  e.preventDefault();
+  const submitBtn = document.getElementById("btnConfirmOrder");
+  const originalText = submitBtn.innerHTML;
+  submitBtn.disabled = true;
+  submitBtn.innerHTML = `<span>⏳ Processing Payment & Order...</span>`;
+
+  try {
+    // Step 1: Ensure DB Cart has items
+    const dbCart = await API.get("/api/cart", true);
+    if (!dbCart.items || dbCart.items.length === 0) {
+      for (const item of state.cart) {
+        await API.post("/api/cart/items", { productId: item.productId, quantity: item.quantity }, true);
+      }
+    }
+
+    // Step 2: Determine address ID
+    let addressId = state.selectedAddressId;
+    if (!addressId) {
+      const addressLine = document.getElementById("chkAddress").value;
+      const city = document.getElementById("chkCity").value;
+      const stateVal = document.getElementById("chkState").value;
+      const postalCode = document.getElementById("chkZip").value;
+      const country = document.getElementById("chkCountry").value;
+
+      const newAddress = await API.post("/api/addresses", {
+        addressLine,
+        city,
+        state: stateVal,
+        postalCode,
+        country,
+        isDefault: true,
+      }, true);
+      addressId = newAddress.id;
+    }
+
+    // Step 3: Payment Method
+    const paymentMethod = document.getElementById("chkPaymentMethod").value;
+
+    // Step 4: Create Order (atomic stock reservation, snapshot prices)
+    const order = await API.post("/api/orders", {
+      addressId,
+      paymentMethod,
+      notes: "Placed via JPBazaar Storefront Web App",
+    }, true);
+
+    // Step 5: Process Simulated Payment
+    const payment = await API.post("/api/payments/process", {
+      orderId: order.id,
+      paymentMethod,
+      simulateFailure: false,
+    }, true);
+
+    // Step 6: Success! Clear state and show modal
+    closeAllModals();
+    await syncUserCart();
+
+    openOrderSuccessModal(order.id, order.totalAmount, payment.transactionId, paymentMethod);
+    showToast(`Order #${order.id} confirmed and paid! 🎉`, "success");
+  } catch (err) {
+    showToast("Checkout failed: " + err.message, "error");
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.innerHTML = originalText;
+  }
+}
+
+function openOrderSuccessModal(orderId, amount, txnId, method) {
   const modal = document.getElementById("successModalBackdrop");
   document.getElementById("successOrderNum").textContent = `#${orderId}`;
   document.getElementById("successOrderTotal").textContent = `$${Number(amount).toFixed(2)}`;
+  document.getElementById("successTxnId").textContent = txnId || "TXN-SIMULATED";
+  document.getElementById("successPaymentMethod").textContent = method;
   modal.classList.add("active");
 }
 
 // User Profile & Order History
 async function openProfileModal() {
   const modal = document.getElementById("profileModalBackdrop");
-  document.getElementById("profileUserName").textContent = `${state.user.firstName} ${state.user.lastName}`;
+  document.getElementById("profileUserName").textContent = `${state.user.firstName} ${state.user.lastName || ''}`;
   document.getElementById("profileUserEmail").textContent = state.user.email;
   document.getElementById("profileUserRole").textContent = state.user.role;
 
   try {
-    const orders = await API.get("/api/orders/my-orders", true);
+    const res = await API.get("/api/orders", true);
+    const orders = res.content || (Array.isArray(res) ? res : []);
     const container = document.getElementById("profileOrdersContainer");
+
     if (!orders || orders.length === 0) {
-      container.innerHTML = `<p style="color: var(--gray-500); font-size: 0.875rem;">No past orders found.</p>`;
+      container.innerHTML = `<p style="color: var(--gray-500); font-size: 0.875rem; padding: 16px 0;">No past orders found. Place your first order today!</p>`;
     } else {
       container.innerHTML = orders.map(o => `
-        <div style="background: var(--gray-50); border: 1px solid var(--gray-200); padding: 12px; border-radius: var(--radius-md); margin-bottom: 10px;">
-          <div style="display: flex; justify-content: space-between; font-weight: 700; margin-bottom: 4px;">
-            <span>Order #${o.id}</span>
-            <span style="color: var(--primary);">$${Number(o.totalAmount).toFixed(2)}</span>
+        <div style="background: var(--gray-50); border: 1px solid var(--gray-200); padding: 16px; border-radius: var(--radius-md); margin-bottom: 12px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <div>
+              <span style="font-weight: 800; color: var(--dark); font-size: 1rem;">Order #${o.id}</span>
+              <span style="color: var(--gray-500); font-size: 0.8125rem; margin-left: 8px;">${new Date(o.createdAt).toLocaleDateString()}</span>
+            </div>
+            <span class="brand-badge" style="background: ${o.status === 'CONFIRMED' ? '#dcfce7' : '#e0e7ff'}; color: ${o.status === 'CONFIRMED' ? '#166534' : '#3730a3'}; font-size: 0.75rem;">
+              ${o.status}
+            </span>
           </div>
-          <div style="display: flex; justify-content: space-between; font-size: 0.8125rem; color: var(--gray-600);">
-            <span>Status: <strong style="color: var(--dark);">${o.status}</strong></span>
-            <span>${new Date(o.createdAt).toLocaleDateString()}</span>
+
+          <div style="font-size: 0.875rem; color: var(--gray-700); margin-bottom: 8px;">
+            ${(o.items || []).map(i => `${i.quantity}x ${escapeHtml(i.productName)}`).join(", ") || 'Items'}
+          </div>
+
+          <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.875rem; border-top: 1px dashed var(--gray-200); padding-top: 8px;">
+            <span style="color: var(--gray-600);">Payment: <strong>${o.paymentMethod || 'CARD'}</strong></span>
+            <span style="font-weight: 800; color: var(--dark); font-size: 1.05rem;">Total: $${Number(o.totalAmount).toFixed(2)}</span>
           </div>
         </div>
       `).join("");
@@ -575,7 +702,7 @@ async function openAdminModal() {
   modal.classList.add("active");
 }
 
-// Authentication (Login / Register)
+// Authentication
 function openAuthModal(tab = "login") {
   const modal = document.getElementById("authModalBackdrop");
   switchAuthTab(tab);
@@ -608,9 +735,9 @@ async function handleLogin(e) {
 
   try {
     const res = await API.post("/api/auth/login", { email, password });
-    handleAuthSuccess(res);
+    await handleAuthSuccess(res);
     closeAllModals();
-    showToast("Signed in successfully! Welcome back.", "success");
+    showToast(`Welcome back, ${state.user.firstName}!`, "success");
   } catch (err) {
     showToast(err.message, "error");
   }
@@ -633,15 +760,16 @@ async function handleRegister(e) {
       phone,
       role: "CUSTOMER",
     });
-    handleAuthSuccess(res);
+    await handleAuthSuccess(res);
     closeAllModals();
-    showToast("Registration successful! Welcome to JPBazaar.", "success");
+    showToast("Account created successfully! Welcome to JPBazaar.", "success");
   } catch (err) {
     showToast(err.message, "error");
   }
 }
 
-function handleAuthSuccess(res) {
+async function handleAuthSuccess(res) {
+  const localCartItems = [...state.cart];
   state.token = res.token || res.accessToken;
   state.user = {
     id: res.userId,
@@ -656,8 +784,18 @@ function handleAuthSuccess(res) {
   localStorage.setItem("jpbazaar_user", JSON.stringify(state.user));
 
   renderAuthNav();
-  syncUserCart();
-  syncUserWishlist();
+
+  // If there were local cart items, push them to the server
+  if (localCartItems.length > 0) {
+    for (const item of localCartItems) {
+      try {
+        await API.post("/api/cart/items", { productId: item.productId, quantity: item.quantity }, true);
+      } catch (e) {}
+    }
+  }
+
+  await syncUserCart();
+  await syncUserWishlist();
 }
 
 function logout() {
@@ -669,6 +807,7 @@ function logout() {
 
   localStorage.removeItem("jpbazaar_token");
   localStorage.removeItem("jpbazaar_user");
+  localStorage.removeItem("jpbazaar_local_cart");
 
   renderAuthNav();
   renderCart();
@@ -700,7 +839,7 @@ function setupEventListeners() {
     debounceTimer = setTimeout(() => {
       state.searchQuery = e.target.value;
       renderProducts();
-    }, 250);
+    }, 150);
   });
 
   // Sort change
