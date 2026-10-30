@@ -345,10 +345,12 @@ export interface LowStockProduct {
 
 export interface AdminDashboardStats {
   overview: DashboardOverview;
-  dailySales: DailySales[];
-  categorySales: CategorySales[];
-  orderStatusCounts: OrderStatusCount[];
-  recentOrders: RecentOrderSummary[];
-  topSellingProducts: TopSellingProduct[];
-  lowStockProducts: LowStockProduct[];
+  dailySales?: DailySales[];
+  recentSalesTrend?: DailySales[];
+  categorySales?: CategorySales[];
+  ordersByStatus?: OrderStatusCount[];
+  orderStatusCounts?: OrderStatusCount[];
+  recentOrders?: RecentOrderSummary[];
+  topSellingProducts?: TopSellingProduct[];
+  lowStockProducts?: LowStockProduct[];
 }
