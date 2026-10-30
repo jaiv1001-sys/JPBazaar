@@ -5,6 +5,7 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
   variant?: 'gold' | 'outline' | 'dark' | 'ghost' | 'danger';
   size?: 'sm' | 'md' | 'lg';
   isLoading?: boolean;
+  fullWidth?: boolean;
   leftIcon?: React.ReactNode;
   rightIcon?: React.ReactNode;
 }
@@ -15,6 +16,7 @@ export const Button: React.FC<ButtonProps> = ({
   variant = 'gold',
   size = 'md',
   isLoading = false,
+  fullWidth = false,
   leftIcon,
   rightIcon,
   disabled,
@@ -39,7 +41,7 @@ export const Button: React.FC<ButtonProps> = ({
 
   return (
     <button
-      className={cn(baseStyles, variants[variant], sizes[size], className)}
+      className={cn(baseStyles, variants[variant], sizes[size], fullWidth && 'w-full', className)}
       disabled={disabled || isLoading}
       {...props}
     >
