@@ -2,6 +2,7 @@ package com.jpbazaar.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.BatchSize;
 import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.OffsetDateTime;
@@ -36,6 +37,7 @@ public class Category {
     private OffsetDateTime createdAt;
 
     @OneToMany(mappedBy = "category")
+    @BatchSize(size = 25)
     @Builder.Default
     private List<Product> products = new ArrayList<>();
 }

@@ -1,6 +1,7 @@
 package com.jpbazaar.repository;
 
 import com.jpbazaar.entity.OrderItem;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -20,4 +21,11 @@ public interface OrderItemRepository extends JpaRepository<OrderItem, Long> {
            "AND oi.product.id = :productId " +
            "AND oi.order.status != com.jpbazaar.entity.OrderStatus.CANCELLED")
     boolean hasUserPurchasedProduct(@Param("userId") Long userId, @Param("productId") Long productId);
+
+    @Query("SELECT oi.product.id, oi.productName, oi.product.sku, SUM(oi.quantity), SUM(oi.subtotal) " +
+           "FROM OrderItem oi " +
+           "WHERE oi.order.status != com.jpbazaar.entity.OrderStatus.CANCELLED " +
+           "GROUP BY oi.product.id, oi.productName, oi.product.sku " +
+           "ORDER BY SUM(oi.quantity) DESC")
+    List<Object[]> findTopSellingProducts(Pageable pageable);
 }

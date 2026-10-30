@@ -5,6 +5,8 @@ import com.jpbazaar.dto.request.CategoryRequest;
 import com.jpbazaar.dto.response.CategoryResponse;
 import com.jpbazaar.service.CategoryService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -17,7 +19,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/categories")
-@Tag(name = "Category Management", description = "Product Category CRUD APIs")
+@Tag(name = "Categories", description = "Product category hierarchy and admin catalog management")
 public class CategoryController {
 
     private final CategoryService categoryService;
@@ -29,7 +31,12 @@ public class CategoryController {
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
     @SecurityRequirement(name = "Bearer Authentication")
-    @Operation(summary = "Create category", description = "Creates a new product category (Admin only).")
+    @Operation(summary = "Create category (Admin only)", description = "Creates a new category. Evicts category Redis cache. Requires ADMIN role.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "201", description = "Category created successfully"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Forbidden (Admin role required)"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "Category already exists with name")
+    })
     public ResponseEntity<ApiResponse<CategoryResponse>> createCategory(@Valid @RequestBody CategoryRequest request) {
         CategoryResponse response = categoryService.createCategory(request);
         return ResponseEntity
@@ -38,15 +45,24 @@ public class CategoryController {
     }
 
     @GetMapping
-    @Operation(summary = "Get all categories", description = "Retrieves all product categories (Public).")
+    @Operation(summary = "Get all categories (Public)", description = "Retrieves all categories. Cached in Redis with 60m TTL (Public).")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Categories retrieved successfully")
+    })
     public ResponseEntity<ApiResponse<List<CategoryResponse>>> getAllCategories() {
         List<CategoryResponse> response = categoryService.getAllCategories();
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
     @GetMapping("/{id}")
-    @Operation(summary = "Get category by ID", description = "Retrieves a single category by ID (Public).")
-    public ResponseEntity<ApiResponse<CategoryResponse>> getCategoryById(@PathVariable Long id) {
+    @Operation(summary = "Get category by ID (Public)", description = "Retrieves a single category by ID. Cached in Redis (Public).")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Category retrieved successfully"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Category not found")
+    })
+    public ResponseEntity<ApiResponse<CategoryResponse>> getCategoryById(
+            @Parameter(description = "Category ID", example = "1") @PathVariable Long id
+    ) {
         CategoryResponse response = categoryService.getCategoryById(id);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
@@ -54,9 +70,15 @@ public class CategoryController {
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     @SecurityRequirement(name = "Bearer Authentication")
-    @Operation(summary = "Update category", description = "Updates category details (Admin only).")
+    @Operation(summary = "Update category (Admin only)", description = "Updates category details and evicts Redis caches. Requires ADMIN role.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Category updated successfully"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Forbidden (Admin role required)"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Category not found"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "Category name already in use")
+    })
     public ResponseEntity<ApiResponse<CategoryResponse>> updateCategory(
-            @PathVariable Long id,
+            @Parameter(description = "Category ID", example = "1") @PathVariable Long id,
             @Valid @RequestBody CategoryRequest request
     ) {
         CategoryResponse response = categoryService.updateCategory(id, request);
@@ -66,8 +88,16 @@ public class CategoryController {
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     @SecurityRequirement(name = "Bearer Authentication")
-    @Operation(summary = "Delete category", description = "Deletes a category if it contains no products (Admin only).")
-    public ResponseEntity<ApiResponse<Void>> deleteCategory(@PathVariable Long id) {
+    @Operation(summary = "Delete category (Admin only)", description = "Deletes a category if no products are associated with it. Requires ADMIN role.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Category deleted successfully"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Cannot delete category with associated products"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Forbidden (Admin role required)"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Category not found")
+    })
+    public ResponseEntity<ApiResponse<Void>> deleteCategory(
+            @Parameter(description = "Category ID", example = "1") @PathVariable Long id
+    ) {
         categoryService.deleteCategory(id);
         return ResponseEntity.ok(ApiResponse.success("Category deleted successfully", null));
     }

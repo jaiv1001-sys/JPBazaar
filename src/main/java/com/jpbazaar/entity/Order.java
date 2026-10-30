@@ -2,6 +2,7 @@ package com.jpbazaar.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.BatchSize;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
@@ -13,7 +14,9 @@ import java.util.List;
 @Entity
 @Table(name = "orders", indexes = {
         @Index(name = "idx_orders_user_id", columnList = "user_id"),
-        @Index(name = "idx_orders_status", columnList = "status")
+        @Index(name = "idx_orders_status", columnList = "status"),
+        @Index(name = "idx_orders_created_at", columnList = "created_at"),
+        @Index(name = "idx_orders_status_created_at", columnList = "status, created_at")
 })
 @Getter
 @Setter
@@ -53,6 +56,7 @@ public class Order {
     private OffsetDateTime updatedAt;
 
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
+    @BatchSize(size = 25)
     @Builder.Default
     private List<OrderItem> items = new ArrayList<>();
 

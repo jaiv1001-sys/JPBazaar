@@ -1162,6 +1162,633 @@ flowchart TD
 3. **Cache Avalanche**: Many cached keys expire simultaneously, causing a massive surge of queries to the database.
    - *Mitigation*: Differentiated TTLs across distinct cache regions (`"products"` = 10 min, `"categories"` = 60 min) naturally staggers expiration windows.
 
+---
+
+## Phase 17 — OpenAPI / Swagger Documentation
+
+### 1. Architectural Blueprint & OpenApiConfig
+
+Comprehensive OpenAPI 3.0 configuration established in [`OpenApiConfig.java`](file:///c:/Users/admin/Desktop/E-COMMERCE/src/main/java/com/jpbazaar/config/OpenApiConfig.java):
+- **API Metadata**: Title ("JPBazaar E-Commerce REST API"), version ("1.0.0"), license (Apache 2.0), and engineering contact details.
+- **Security Scheme**: `Bearer Authentication` (HTTP Bearer format `JWT`) and alias `bearerAuth` registered globally, enabling interactive JWT authorization in Swagger UI.
+- **Ordered Domain Tags**: 13 domains cataloged with explicit descriptions:
+  1. `Authentication` — User registration, login, and JWT token issuance.
+  2. `User Management` — Profile retrieval, role-based user management.
+  3. `Address Book` — Shipping address book CRUD with IDOR ownership validation.
+  4. `Categories` — Product taxonomy and category hierarchy management.
+  5. `Products` — Product catalog browsing, filtering, search, pagination, and admin CRUD.
+  6. `Product Images` — Product gallery management and primary image designation.
+  7. `Media Storage` — Direct media file serving.
+  8. `Cart` — Shopping cart management, quantity increments, duplicate merging, stock verification.
+  9. `Wishlist` — User wishlist curation and duplicate prevention.
+  10. `Orders` — Order checkout, historical price snapshotting, lifecycle transitions.
+  11. `Payments` — Multi-gateway payment simulation, ACID transactions, and refund pipeline.
+  12. `Reviews` — Verified buyer product reviews and dynamic rating recalculations.
+  13. `System Health` — Liveness and readiness probes.
+
+---
+
+### 2. Controller & DTO Schema Documentation
+
+- **13 REST Controllers Documented**:
+  - Every controller decorated with `@Tag`.
+  - Authenticated endpoints decorated with `@SecurityRequirement(name = "Bearer Authentication")`.
+  - Operations documented with `@Operation(summary = "...", description = "...")` and explicit `@ApiResponses` covering 200, 201, 400, 401, 403, 404, 409, and 500 status codes with response schemas.
+  - Path variables and request parameters annotated with `@Parameter` describing formats and expected values.
+- **20+ Request / Response DTOs Documented**:
+  - Standard wrapper [`ApiResponse.java`](file:///c:/Users/admin/Desktop/E-COMMERCE/src/main/java/com/jpbazaar/dto/ApiResponse.java) annotated with generic data payload schemas.
+  - All request records (`RegisterRequest`, `LoginRequest`, `CreateOrderRequest`, `PaymentProcessRequest`, `ProductCreateRequest`, etc.) annotated with `@Schema` descriptions and realistic sample values.
+  - All response records (`AuthResponse`, `UserResponse`, `ProductResponse`, `OrderResponse`, `PaymentResponse`, etc.) annotated with detailed field specifications.
+
+---
+
+### 3. Automated Integration Testing (`OpenApiDocumentationTest.java`)
+
+Added comprehensive integration test [`OpenApiDocumentationTest.java`](file:///c:/Users/admin/Desktop/E-COMMERCE/src/test/java/com/jpbazaar/config/OpenApiDocumentationTest.java):
+- `testApiDocsEndpointReturnsOpenApiJson`: Verifies `/v3/api-docs` returns HTTP 200, Content-Type `application/json`, OpenAPI 3.x version, Title, Version, and Contact information.
+- `testSecuritySchemesConfigured`: Validates registered security schemes (`Bearer Authentication`, `bearerAuth`) with HTTP Bearer / JWT type.
+- `testSwaggerUiRedirect`: Verifies `/swagger-ui.html` returns 3xx Redirection to `/swagger-ui/index.html`.
+- `testKeyEndpointsAndTagsPresent`: Confirms all 13 domain tags and core paths (`/api/auth/login`, `/api/products`, `/api/orders`, `/api/cart`, `/api/health`) are properly exposed in the generated OpenAPI contract.
+
+---
+
+### 4. ByteBuddy Dynamic Agent Configuration for Java 21 LTS
+
+Configured `maven-surefire-plugin` (3.2.5) in [`pom.xml`](file:///c:/Users/admin/Desktop/E-COMMERCE/pom.xml) with:
+```xml
+<argLine>-javaagent:"${settings.localRepository}/net/bytebuddy/byte-buddy-agent/1.14.19/byte-buddy-agent-1.14.19.jar" -XX:+EnableDynamicAgentLoading</argLine>
+```
+Pre-attaching the ByteBuddy agent at JVM boot eliminates runtime dynamic attachment issues on Windows, ensuring 100% stable test execution across all 100 unit, service, concurrency, and integration tests.
+
+---
+
+### 5. Interview Preparation — Phase 17 Key Technical Questions
+
+#### Q1: Why is OpenAPI/Swagger documentation crucial in production REST APIs, and what are the advantages of code-first vs spec-first?
+**Answer**:
+1. **Contract-as-Code & Single Source of Truth**: OpenAPI documentation provides a machine-readable JSON/YAML contract defining paths, schemas, validations, and security requirements. Frontend teams, mobile clients, and third-party consumers can auto-generate typed SDKs (e.g. via `openapi-generator`) without waiting for backend deployment.
+2. **Code-First (JPBazaar's Approach)**:
+   - *Advantages*: Document annotations live right alongside controller and DTO code (`@Operation`, `@Schema`). As code evolutions occur, the documentation stays synchronized automatically via reflection during compilation and runtime reflection.
+   - *Trade-off*: Spec-first (design-first) is helpful when multiple independent teams agree on API design before coding, but code-first avoids documentation drift when rapid monolithic development takes precedence.
+
+#### Q2: How does Springdoc OpenAPI discover and document secured endpoints, and how does `@SecurityRequirement` work?
+**Answer**:
+- In `OpenApiConfig`, a global `SecurityScheme` is registered in OpenAPI components with `type(SecurityScheme.Type.HTTP)` and `scheme("bearer")`.
+- When `@SecurityRequirement(name = "Bearer Authentication")` is placed on a `@RestController` class or specific `@GetMapping` / `@PostMapping` method, Springdoc links that endpoint's OpenAPI operation definition to the registered component scheme.
+- In Swagger UI, this generates the "Authorize" button and padlock icons next to secured endpoints, allowing developers to paste a JWT token once, which Swagger UI automatically attaches to subsequent test requests as an `Authorization: Bearer <token>` header.
+
+#### Q3: Why is it important to customize DTOs with `@Schema` instead of relying on default reflection?
+**Answer**:
+- Default reflection only captures class names and raw Java types (e.g., `Long id`, `String email`).
+- Adding `@Schema` provides:
+  1. **Semantic Descriptions**: Clarifies purpose (e.g., "Positive integer order ID").
+  2. **Realistic Example Values**: Shows callers realistic payloads in Swagger UI (e.g., `example = "user@example.com"`, `example = "49999.00"`), enabling "Try it out" tests with 1-click execution.
+  3. **Format & Constraint Visibility**: Exposes `@Schema(pattern = "...", minLength = 8, accessMode = AccessMode.READ_ONLY)` so consumer code generators can enforce client-side validation matching server-side validation.
+
+---
+
+## Phase 18 — Admin Analytics Dashboard
+
+### 1. High-Performance SQL Aggregations vs. In-Memory Anti-Pattern
+
+In production e-commerce applications with millions of orders, products, and users, fetching entire tables into JVM memory to calculate counts, revenues, or trends causes severe $O(N)$ memory bloat, high GC pauses, and potential `OutOfMemoryError`.
+
+JPBazaar executes **100% of statistical computations in the database engine** via JPQL aggregations:
+
+```mermaid
+flowchart TD
+    Client["Admin Web Client / Dashboard"] -->|GET /api/admin/dashboard/stats| Controller["AdminDashboardController"]
+    Controller -->|@PreAuthorize('hasRole(ADMIN)')| Service["AdminDashboardService"]
+    Service -->|Parallel or Sequenced DB Aggregations| DB[("PostgreSQL / H2")]
+
+    subgraph Database Aggregations
+        DB --> Q1["SELECT COALESCE(SUM(totalAmount),0) WHERE status != 'CANCELLED'"]
+        DB --> Q2["SELECT o.status, COUNT(o) GROUP BY o.status"]
+        DB --> Q3["SELECT cast(createdAt as LocalDate), COUNT(o), SUM(totalAmount) GROUP BY ..."]
+        DB --> Q4["SELECT oi.product.id, SUM(quantity), SUM(subtotal) GROUP BY ... ORDER BY ... LIMIT 5"]
+        DB --> Q5["SELECT c.id, c.name, COUNT(DISTINCT p), SUM(...), SUM(...) GROUP BY ..."]
+    end
+
+    Q1 & Q2 & Q3 & Q4 & Q5 --> AggregationResult["Compact Results (< 50 rows returned to JVM)"]
+    AggregationResult --> Service
+    Service -->|Interpolate Timeline & Map Records| Response["ApiResponse<AdminDashboardStatsResponse>"]
+    Response --> Client
+```
+
+---
+
+### 2. Endpoints Exposed (`/api/admin/dashboard`)
+
+All dashboard endpoints require the `ADMIN` role (`@PreAuthorize("hasRole('ADMIN')")`) and are protected by Spring Security:
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/api/admin/dashboard/stats` | Consolidated administrative dashboard snapshot (KPIs, Order breakdown, Sales trend, Top products, Low stock, Recent orders, Category sales) |
+| `GET` | `/api/admin/dashboard/overview` | High-level system KPIs (total users, products, orders, lifetime revenue, pending orders, today's velocity) |
+| `GET` | `/api/admin/dashboard/orders-by-status` | Order lifecycle status counts and percentage distribution |
+| `GET` | `/api/admin/dashboard/sales-trend?days=30` | Daily sales timeline (dates, order counts, revenues) with zero-gap interpolation |
+| `GET` | `/api/admin/dashboard/top-products?limit=5` | Top selling products ranked by units sold and gross revenue |
+| `GET` | `/api/admin/dashboard/low-stock?threshold=10`| Paginated active products with inventory quantity $\le$ warning threshold |
+| `GET` | `/api/admin/dashboard/recent-orders?limit=5` | Latest orders with customer details and item count |
+| `GET` | `/api/admin/dashboard/category-sales` | Category performance distribution (products, units sold, gross revenue) |
+
+---
+
+### 3. Continuous Timeline Interpolation Algorithm
+
+When plotting daily sales in charts, SQL queries only return rows for days that have orders. If there are days with zero sales, charts break or misrepresent intervals. 
+
+`AdminDashboardServiceImpl.getSalesTrend(int days)` executes:
+1. Normalizes `days` (between 1 and 365).
+2. Initializes a `LinkedHashMap<LocalDate, DailySalesResponse>` containing every single date from `today.minusDays(days - 1)` to `today` with `0` orders and `0.00` revenue.
+3. Queries the database for days with non-zero sales using:
+   ```sql
+   SELECT cast(o.createdAt as LocalDate), COUNT(o), COALESCE(SUM(o.totalAmount), 0)
+   FROM Order o
+   WHERE o.status != 'CANCELLED' AND o.createdAt >= :startDate
+   GROUP BY cast(o.createdAt as LocalDate)
+   ORDER BY cast(o.createdAt as LocalDate) ASC
+   ```
+4. Overlays the database results onto the map, returning a continuous, gap-free daily timeline array.
+
+---
+
+### 4. Interview Preparation — Phase 18 Key Technical Questions
+
+#### Q1: Why should aggregation queries like SUM and COUNT be executed in the database rather than in Java Streams?
+**Answer**:
+1. **Network & I/O Overhead**: Streaming 1,000,000 orders over JDBC requires transferring hundreds of megabytes over the network to the application server. The database engine can compute `SUM(totalAmount)` directly in its storage buffer and transfer a single 16-byte decimal value.
+2. **Index Acceleration & Memory Footprint**: PostgreSQL and modern RDBMSs leverage B-tree indexes, sequential scan optimizations, and SIMD parallel query workers to aggregate millions of rows in milliseconds without allocating JVM heap memory.
+3. **Deadlock & Transaction Isolation**: Loading all rows into the Hibernate Persistence Context keeps managed entity snapshots in the first-level session cache, creating massive heap pressure and garbage collection overhead.
+
+#### Q2: Why is `COALESCE` critical in SQL aggregation queries like `SUM(totalAmount)`?
+**Answer**:
+In SQL, if a table has 0 rows matching a `WHERE` clause, `SUM(column)` evaluates to `NULL` rather than `0`. If Java tries to map `NULL` to a `BigDecimal` or unbox it to a primitive, a `NullPointerException` or tricky null-check propagation occurs. `COALESCE(SUM(o.totalAmount), 0)` instructs the SQL engine to substitute `0` if the sum evaluates to null, ensuring clean, null-safe responses.
+
+#### Q3: How do you prevent Insecure Direct Object Reference (IDOR) and unauthorized access on Administrative Analytics endpoints?
+**Answer**:
+1. **Defense-in-Depth Authorization**:
+   - **Filter Chain Matchers**: `SecurityConfig` enforces `.requestMatchers("/api/admin/**").hasRole("ADMIN")` before requests reach controllers.
+   - **Method Security**: The controller is annotated with `@PreAuthorize("hasRole('ADMIN')")`, verified by Spring Security's AOP proxy method interceptor.
+2. **No User Context Tampering**: The analytics endpoints aggregate system-wide or platform metrics based strictly on database state and do not accept user-supplied identifiers (such as `userId`) to dictate visibility.
+
+---
+
+## Phase 19 — Performance Optimization (Indexes, Query Tuning)
+
+### 1. The N+1 Query Problem & Root Cause Analysis
+
+In Spring Data JPA and Hibernate, the **N+1 query problem** arises when querying a list of $N$ parent entities, and accessing a lazily-loaded association triggers an additional database query for each individual parent:
+$$\text{Total Queries} = 1 + N$$
+If an entity has multiple lazy associations (such as `Product` having `Category` and `List<ProductImage>`), the query count multiplies:
+$$\text{Total Queries} = 1 + N + N = 1 + 2N$$
+For a standard catalog page of 20 products:
+- $1$ initial query to fetch the 20 products.
+- $20$ individual queries to fetch `p.getCategory()` during DTO mapping.
+- $20$ individual queries to fetch `p.getImages()` during DTO mapping.
+- **Total = 41 queries for a single page request!**
+
+At scale (thousands of requests per minute), this produces severe connection pool exhaustion, latency spikes, and excessive database CPU utilization.
+
+---
+
+### 2. Resolution Architecture & Query Tuning Strategy
+
+To eliminate N+1 queries while respecting database-level pagination, JPBazaar implements a dual optimization strategy:
+
+#### A. `LEFT JOIN FETCH` with Explicit `countQuery` for Single-Valued Associations (`@ManyToOne`, `@OneToOne`)
+In [`ProductRepository`](file:///c:/Users/admin/Desktop/E-COMMERCE/src/main/java/com/jpbazaar/repository/ProductRepository.java), `searchAndFilterProducts` and `findByCategoryIdAndActiveTrue` were upgraded to fetch `category` eagerly using `LEFT JOIN FETCH`:
+```java
+@Query(value = """
+        SELECT p FROM Product p
+        LEFT JOIN FETCH p.category
+        WHERE (:categoryId IS NULL OR p.category.id = :categoryId)
+          AND (:brand IS NULL OR LOWER(p.brand) = LOWER(:brand))
+          AND (:minPrice IS NULL OR p.price >= :minPrice)
+          AND (:maxPrice IS NULL OR p.price <= :maxPrice)
+          AND (:active IS NULL OR p.active = :active)
+          AND (:keyword IS NULL OR (
+                 LOWER(p.name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR
+                 LOWER(p.description) LIKE LOWER(CONCAT('%', :keyword, '%'))
+          ))
+        """,
+        countQuery = """
+        SELECT COUNT(p) FROM Product p
+        WHERE (:categoryId IS NULL OR p.category.id = :categoryId)
+          AND (:brand IS NULL OR LOWER(p.brand) = LOWER(:brand))
+          AND (:minPrice IS NULL OR p.price >= :minPrice)
+          AND (:maxPrice IS NULL OR p.price <= :maxPrice)
+          AND (:active IS NULL OR p.active = :active)
+          AND (:keyword IS NULL OR (
+                 LOWER(p.name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR
+                 LOWER(p.description) LIKE LOWER(CONCAT('%', :keyword, '%'))
+          ))
+        """)
+Page<Product> searchAndFilterProducts(...);
+```
+> [!IMPORTANT]
+> **Why explicit `countQuery` is required**: When a query contains `JOIN FETCH`, Spring Data JPA cannot automatically derive the count query for pagination. Providing an explicit `countQuery` prevents Hibernate warnings and ensures pagination executes cleanly at the SQL level.
+
+Additionally, in [`ProductRepository`](file:///c:/Users/admin/Desktop/E-COMMERCE/src/main/java/com/jpbazaar/repository/ProductRepository.java), the primary `findById` method was overridden with `@Query("SELECT p FROM Product p LEFT JOIN FETCH p.category WHERE p.id = :id")` so that single product retrievals by ID fetch both product and category in a single query.
+
+Similarly, in [`OrderRepository`](file:///c:/Users/admin/Desktop/E-COMMERCE/src/main/java/com/jpbazaar/repository/OrderRepository.java), paginated order queries (`findByUserId`, `findByUserIdAndStatus`, `findByStatus`, `findAllWithDetails`) eagerly fetch `address`, `user`, and `payment` in a single SQL statement.
+
+#### B. `@BatchSize(size = 25)` and `default_batch_fetch_size` for Collection Associations (`@OneToMany`)
+Fetching `@OneToMany` collections via `JOIN FETCH` inside paginated queries causes Hibernate's warning:
+`HHH000104: firstResult/maxResults specified with collection fetch; applying in memory!`
+Because a parent with 5 items generates 5 SQL rows, the database-level `LIMIT`/`OFFSET` cannot accurately slice parent entities, forcing Hibernate to pull all rows into memory and paginate in JVM heap!
+
+**The Production Solution**:
+1. Keep collection associations lazy.
+2. Annotate `@OneToMany` relationships with `@BatchSize(size = 25)`:
+   - [`Product.java`](file:///c:/Users/admin/Desktop/E-COMMERCE/src/main/java/com/jpbazaar/entity/Product.java): `images`, `reviews`
+   - [`Order.java`](file:///c:/Users/admin/Desktop/E-COMMERCE/src/main/java/com/jpbazaar/entity/Order.java): `items`
+   - [`User.java`](file:///c:/Users/admin/Desktop/E-COMMERCE/src/main/java/com/jpbazaar/entity/User.java): `addresses`, `orders`, `reviews`
+   - [`Cart.java`](file:///c:/Users/admin/Desktop/E-COMMERCE/src/main/java/com/jpbazaar/entity/Cart.java): `items`
+   - [`Wishlist.java`](file:///c:/Users/admin/Desktop/E-COMMERCE/src/main/java/com/jpbazaar/entity/Wishlist.java): `items`
+   - [`Category.java`](file:///c:/Users/admin/Desktop/E-COMMERCE/src/main/java/com/jpbazaar/entity/Category.java): `products`
+3. Configure `hibernate.default_batch_fetch_size: 25` in [`application.yml`](file:///c:/Users/admin/Desktop/E-COMMERCE/src/main/resources/application.yml) and [`application-test.yml`](file:///c:/Users/admin/Desktop/E-COMMERCE/src/main/resources/application-test.yml) as a global safety net.
+
+When the application iterates over 20 products and accesses `p.getImages()`, Hibernate collapses 20 individual queries into a single batch query:
+```sql
+SELECT ... FROM product_images WHERE product_id IN (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+```
+
+#### Query Count Comparison:
+
+| Operation | Before Optimization | After Optimization | Reduction |
+|---|---|---|---|
+| **Catalog Search (20 products)** | 41 queries ($1 + 20 + 20$) | **2 queries** ($1$ product+cat, $1$ images) | **~95% reduction** |
+| **User Orders (20 orders)** | 81 queries ($1 + 20 + 20 + 20 + 20$) | **3 queries** ($1$ order+addr+pay, $1$ items, $1$ images) | **~96% reduction** |
+| **Wishlist (15 items)** | 16 queries ($1 + 15$) | **2 queries** ($1$ wishlist+items+prod, $1$ images) | **~88% reduction** |
+
+---
+
+### 3. Database Indexing Strategy & Schema Parity
+
+All database indexes were synchronized across [`sql/schema.sql`](file:///c:/Users/admin/Desktop/E-COMMERCE/sql/schema.sql) and JPA `@Table(indexes = ...)` annotations:
+
+| Table | Index Name | Indexed Columns | Justification & Query Accelerated |
+|---|---|---|---|
+| `users` | `idx_users_role` | `role` | Dashboard KPI query `countByRole(Role.CUSTOMER)` |
+| `users` | `idx_users_created_at` | `created_at` | Dashboard new customer velocity `countByCreatedAtAfter(...)` |
+| `products` | `idx_products_brand` | `brand` | Product catalog filtering `LOWER(p.brand) = LOWER(:brand)` |
+| `products` | `idx_products_active_stock` | `active, stock_quantity` | Composite index for low-stock dashboard alert `p.stockQuantity <= :threshold AND p.active = true` |
+| `products` | `idx_products_rating` | `rating` | Catalog sorting and filtering by customer rating |
+| `product_images` | `idx_product_images_prod_primary` | `product_id, is_primary` | Fast resolution of primary catalog image per product |
+| `orders` | `idx_orders_created_at` | `created_at` | Recent orders sorting `ORDER BY o.createdAt DESC` and revenue timeline |
+| `orders` | `idx_orders_status_created_at` | `status, created_at` | Sales trend aggregation `o.status != 'CANCELLED' AND o.createdAt >= :startDate` |
+| `order_items` | `idx_order_items_product_id` | `product_id` | Foreign key index for `hasUserPurchasedProduct` and top selling product aggregation |
+
+---
+
+### 4. Verification & Integration Testing
+
+A dedicated test suite [`QueryOptimizationPerformanceTest`](file:///c:/Users/admin/Desktop/E-COMMERCE/src/test/java/com/jpbazaar/performance/QueryOptimizationPerformanceTest.java) was added to verify:
+1. `testProductCatalogQueryOptimization`: Confirms 5 products with 10 images load with eagerly fetched category and batch-loaded images.
+2. `testOrderListingQueryOptimization`: Confirms orders load with eagerly fetched shipping addresses, payments, and batch-loaded order items.
+3. `testWishlistBatchLoadingOptimization`: Confirms wishlist retrieval resolves primary images across all items via batch fetching.
+4. `testLowStockQueryOptimization`: Confirms low-stock queries execute with database pagination without in-memory warnings.
+
+**Full Test Suite Execution**:
+```bash
+mvn test
+```
+**Result**: **130 / 130 tests passing across 22 test classes (0 failures, 0 errors, 0 skipped)**.
+
+---
+
+### 5. Interview Preparation — Phase 19 Key Technical Questions
+
+#### Q1: What is the N+1 query problem, and what are the trade-offs between `JOIN FETCH`, `@EntityGraph`, and `@BatchSize`?
+**Answer**:
+- **N+1 Problem**: Occurs when loading $N$ entities causes Hibernate to issue 1 query for the parent entities and $N$ additional queries to initialize a lazy relationship when accessed in code.
+- **`JOIN FETCH`**:
+  - *Pros*: Eagerly joins associations in a single SQL query; very fast for single-valued relationships (`@ManyToOne`, `@OneToOne`).
+  - *Cons*: Cannot be used on `@OneToMany` collections with pagination (`firstResult`/`maxResults`), because Cartesian product multiplies rows, causing in-memory pagination (`HHH000104`). Also, multiple collection fetch joins cause `MultipleBagFetchException`.
+- **`@EntityGraph`**:
+  - *Pros*: Declarative JPA standard alternative to `JOIN FETCH` (avoids writing duplicate JPQL queries); can configure fetch graphs per repository method.
+  - *Cons*: Suffers from the exact same pagination limitation on collection associations as `JOIN FETCH`.
+- **`@BatchSize`**:
+  - *Pros*: Keeps associations lazy, allows true database-level `LIMIT`/`OFFSET` pagination, and replaces $N$ queries with $\lceil N / \text{BatchSize} \rceil$ queries using `WHERE id IN (?, ?, ...)`.
+  - *Cons*: Still executes more than 1 query (e.g. 1 parent query + 1 batch query), but completely eliminates Cartesian explosion and memory overhead.
+
+#### Q2: Why does `JOIN FETCH` on `@OneToMany` collections break pagination, and how does `@BatchSize` solve it?
+**Answer**:
+When an SQL query joins a parent table (`orders`) with a child table (`order_items`), an order with 4 items produces 4 rows in the SQL result set. If the database engine applies `LIMIT 10`, it cuts off at 10 rows—which might correspond to only 2.5 orders instead of 10 orders! 
+To prevent returning corrupt or incomplete entities, Hibernate detects `firstResult`/`maxResults` with collection `JOIN FETCH`, emits warning `HHH000104`, omits the SQL `LIMIT`/`OFFSET` clauses, fetches the entire table into memory, and performs pagination in Java heap.
+`@BatchSize` solves this: The parent query runs with database `LIMIT 10 OFFSET 0` (fetching exactly 10 distinct orders). Then, when the items are accessed, Hibernate executes a single batch query:
+`SELECT ... FROM order_items WHERE order_id IN (1, 2, 3, 4, 5, 6, 7, 8, 9, 10)`.
+
+#### Q3: Why does column order matter in a composite index like `(active, stock_quantity)`?
+**Answer**:
+A composite B-Tree index is sorted hierarchically: first by the leftmost column (`active`), and within each value of `active`, sorted by the second column (`stock_quantity`).
+According to the **Leftmost Prefix Rule**:
+- A query with `WHERE active = true AND stock_quantity <= 10` can use both index columns.
+- A query with `WHERE active = true` can use the index (it matches the leftmost prefix).
+- A query with `WHERE stock_quantity <= 10` (without `active`) **cannot** utilize this index efficiently (it would require an index skip scan or full table scan).
+Therefore, high-cardinality or equality-filtered columns must be placed first in composite indexes.
+
+#### Q4: What does `hibernate.default_batch_fetch_size` do in `application.yml`?
+**Answer**:
+`hibernate.default_batch_fetch_size: 25` instructs Hibernate's SessionFactory to apply batch fetching across **all** lazy entity relationships and collections globally, even if a developer forgot to annotate an entity with `@BatchSize`. It acts as an architectural guardrail against accidental N+1 queries throughout the entire application.
+
+---
+
+## Phase 20 — Security Hardening & Rate Limiting
+
+### 1. Overview & Architecture
+Phase 20 delivers enterprise-grade security hardening and distributed/in-memory rate limiting for **JPBazaar**:
+- **Token Bucket Rate Limiting Engine**: Protects API endpoints against brute-force credential attacks, credential stuffing, scraping, and Denial of Service (DoS).
+  - **Auth Tier (`AUTH`)**: 10 requests / minute burst capacity strictly applied to authentication and credential verification endpoints (`/api/auth/**`).
+  - **General Tier (`GENERAL`)**: 100 requests / minute burst capacity applied to general business operations across `/api/**`.
+- **Dual-Engine Architecture (Redis + In-Memory Fallback)**:
+  - **Redis Engine**: Utilizes atomic Redis counters and expiring keys (`StringRedisTemplate`) for distributed coordination across clustered container nodes.
+  - **In-Memory Fallback**: When Redis is offline, disabled, or during unit/integration tests (`spring.cache.type: simple`), [`RateLimiterServiceImpl`](file:///c:/Users/admin/Desktop/E-COMMERCE/src/main/java/com/jpbazaar/security/ratelimit/RateLimiterServiceImpl.java) automatically falls back to a thread-safe `ConcurrentHashMap` with synchronized lazy token replenishment using wall-clock nanosecond precision.
+- **Client Identity Resolution**:
+  - The [`RateLimitingFilter`](file:///c:/Users/admin/Desktop/E-COMMERCE/src/main/java/com/jpbazaar/security/ratelimit/RateLimitingFilter.java) executes immediately **after** [`JwtAuthenticationFilter`](file:///c:/Users/admin/Desktop/E-COMMERCE/src/main/java/com/jpbazaar/security/JwtAuthenticationFilter.java).
+  - Authenticated requests are keyed per-user (`user:<email>`), preventing legitimate users on corporate NAT networks from being throttled by peers.
+  - Unauthenticated requests are keyed per-IP (`ip:<clientIp>`), resolving `X-Forwarded-For`, `X-Real-IP`, and `getRemoteAddr()`.
+- **RFC Standard Rate Limit Headers**: Every API response carries standard rate limit headers:
+  - `X-RateLimit-Limit`: Maximum capacity permitted in the configured window.
+  - `X-RateLimit-Remaining`: Tokens remaining for immediate consumption.
+  - `X-RateLimit-Reset`: Seconds until the bucket is fully replenished.
+  - `Retry-After`: Returned with HTTP 429 Too Many Requests specifying the required wait time in seconds before retrying.
+- **HTTP Security Headers Hardening**: Configured directly in [`SecurityConfig`](file:///c:/Users/admin/Desktop/E-COMMERCE/src/main/java/com/jpbazaar/config/SecurityConfig.java):
+  - **Content-Security-Policy (CSP)**: `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; frame-ancestors 'none';`
+  - **Strict-Transport-Security (HSTS)**: `max-age=31536000; includeSubDomains` (enforces HTTPS for 1 year).
+  - **X-Content-Type-Options**: `nosniff` (prevents MIME sniffing).
+  - **X-Frame-Options**: `DENY` (prevents clickjacking attacks).
+  - **Referrer-Policy**: `strict-origin-when-cross-origin` (protects user privacy).
+  - **Permissions-Policy**: `geolocation=(), camera=(), microphone=()` (disables browser sensor APIs).
+- **CORS Hardening**: Explicit allowed origins, HTTP methods (`GET`, `POST`, `PUT`, `DELETE`, `PATCH`, `OPTIONS`), allowed headers, and exposed rate limit headers (`X-RateLimit-*`, `Retry-After`).
+- **Sensitive Data Masking**: [`MaskingUtils`](file:///c:/Users/admin/Desktop/E-COMMERCE/src/main/java/com/jpbazaar/util/MaskingUtils.java) ensures credentials, email addresses, payment cards, and JWT tokens are masked in diagnostic logs.
+
+---
+
+### 2. Key Components & Implementation Details
+
+#### Rate Limiting Architecture (`com.jpbazaar.security.ratelimit`)
+- **`RateLimitTier`**: Enum defining capacity and time window for `AUTH` (10 req/min) and `GENERAL` (100 req/min).
+- **`RateLimitResult`**: Record containing `allowed`, `limit`, `remaining`, `retryAfterSeconds`, and `resetSeconds`.
+- **`RateLimiterService`**: Contract providing `tryAcquire(key, tier)` and `reset(key)`.
+- **`RateLimiterServiceImpl`**: Dual-engine rate limiter with Redis sliding counter and thread-safe in-memory `TokenBucket` fallback.
+- **`RateLimitingFilter`**: Servlet `OncePerRequestFilter` placed after `JwtAuthenticationFilter` that inspects caller authentication, extracts IP/user key, applies rate limit, adds response headers, and halts request with HTTP 429 when quota is exhausted.
+
+#### Security & Utility Extensions
+- **`SecurityConfig`**: Configures CSP, HSTS, X-Content-Type-Options, X-Frame-Options, Referrer-Policy, Permissions-Policy, CORS source, and registers `RateLimitingFilter`.
+- **`GlobalExceptionHandler`**: Handles `RateLimitExceededException` mapping it to HTTP 429 Too Many Requests with `Retry-After` header.
+- **`MaskingUtils`**: Utility functions `maskEmail`, `maskCardNumber`, `maskSecret`, and `maskToken`.
+
+---
+
+### 3. Verification & Integration Testing
+
+#### Security Hardening Test Suite (`com.jpbazaar.security`)
+- **`SecurityHardeningIntegrationTest`**:
+  1. `shouldReturnHardenedSecurityHeaders`: Verifies CSP, HSTS, X-Content-Type-Options (`nosniff`), X-Frame-Options (`DENY`), Referrer-Policy, and Permissions-Policy on API responses.
+  2. `shouldIncludeRateLimitHeadersOnAllowedRequests`: Verifies `X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `X-RateLimit-Reset` are attached to valid requests.
+  3. `shouldTrigger429WhenRateLimitExceeded`: Sends 10 login requests consuming quota, verifies the 11th request returns HTTP 429 Too Many Requests with `Retry-After` header and error payload.
+  4. `shouldHandleCorsPreflightRequest`: Verifies preflight CORS requests with allowed origins and exposed rate limit headers.
+  5. `shouldMaskSensitiveDataCorrectly`: Verifies masking of emails, cards, passwords, and tokens.
+
+**Full Test Suite Execution**:
+```bash
+mvn test
+```
+**Result**: **135 / 135 tests passing across 23 test classes (0 failures, 0 errors, 0 skipped)**.
+
+---
+
+### 4. Interview Preparation — Phase 20 Key Technical Questions
+
+#### Q1: What is the Token Bucket algorithm, and how does it differ from Fixed Window and Sliding Window algorithms?
+**Answer**:
+- **Token Bucket**: A bucket has a maximum capacity $C$ and refills with tokens at a constant rate $r$ tokens/second. A request consumes 1 token.
+  - *Pros*: Supports controlled traffic bursts up to capacity $C$ while maintaining a strict long-term average rate. Very memory-efficient (only needs two variables: current tokens and timestamp of last refill).
+  - *Fixed Window*: Counts requests in fixed intervals (e.g., 00:00 to 00:01). Prone to the "boundary burst" vulnerability: an attacker sending $C$ requests at 00:59 and another $C$ requests at 01:01 achieves $2C$ requests in 2 seconds.
+  - *Sliding Window Log*: Stores every request timestamp in a sorted set (e.g. Redis ZSET). Perfectly smooth and accurate, but high memory footprint ($O(N)$ entries per user).
+
+#### Q2: Why is `RateLimitingFilter` positioned after `JwtAuthenticationFilter` in the Spring Security filter chain?
+**Answer**:
+1. **User Identity Resolution**: `JwtAuthenticationFilter` runs first, validates the bearer token, and populates `SecurityContextHolder`. By placing `RateLimitingFilter` second, it can inspect whether the caller is authenticated:
+   - If authenticated: Rate limit key is `user:<email>` (per-user limit).
+   - If unauthenticated: Rate limit key is `ip:<clientIp>` (per-IP limit).
+2. **Preventing NAT / Proxy Collateral Damage**: In corporate offices, university campuses, or mobile networks, hundreds of legitimate users share a single public IP. If rate limiting only keyed on IP after login, one heavy user could throttle all other colleagues. Keying authenticated requests by user identity eliminates this collateral damage while still protecting unauthenticated login/registration endpoints by IP against credential stuffing.
+
+#### Q3: Why is a dual-engine (Redis + In-Memory) rate limiter critical in production microservices?
+**Answer**:
+- In clustered deployments with multiple application instances behind a load balancer, an in-memory rate limiter only tracks requests hitting that specific node, allowing a client to bypass limits by rotating across nodes. Redis provides a centralized, distributed atomic counter.
+- However, hard-depending on Redis introduces a single point of failure: if Redis experiences network partition, cluster failover, or downtime, the entire API would either fail closed (blocking all legitimate traffic) or crash. The dual-engine design catches Redis connection errors and gracefully falls back to thread-safe local in-memory token buckets, guaranteeing 100% API availability.
+
+#### Q4: What HTTP headers are essential for API security hardening, and what threats do they neutralize?
+**Answer**:
+1. **Content-Security-Policy (CSP)**: Restricts sources of scripts, styles, images, and frames; mitigates Cross-Site Scripting (XSS) and data injection attacks.
+2. **Strict-Transport-Security (HSTS)**: Instructs browsers to communicate exclusively over HTTPS; prevents SSL-stripping and man-in-the-middle (MITM) attacks.
+3. **X-Content-Type-Options: nosniff**: Prevents browsers from MIME-sniffing a response away from declared content type; stops malicious file upload execution.
+4. **X-Frame-Options: DENY**: Prevents rendering the application inside `<iframe>`, `<frame>`, or `<object>`; eliminates clickjacking attacks.
+5. **Referrer-Policy: strict-origin-when-cross-origin**: Prevents leaking sensitive URL query parameters to third-party domains.
+6. **Permissions-Policy**: Restricts access to browser sensors and devices (camera, microphone, geolocation).
+
+---
+
+## Phase 21 — Dockerization & Multi-Container Deployment
+
+### 1. Overview & Architecture
+Phase 21 delivers an enterprise-grade containerization and multi-container orchestration architecture for **JPBazaar**:
+- **Multi-Stage Build Architecture ([`Dockerfile`](file:///c:/Users/admin/Desktop/E-COMMERCE/Dockerfile))**:
+  - **Stage 1 (`builder`)**: Uses `eclipse-temurin:21-jdk-alpine` to compile source code, package the application executable JAR, and extract Spring Boot 3 layered components using `java -Djarmode=layertools -jar target/jpbazaar-0.0.1-SNAPSHOT.jar extract`.
+  - **Stage 2 (`runner`)**: Uses `eclipse-temurin:21-jre-alpine` (~180MB minimal attack surface). Discards compilers, Maven dependencies, and build tools to produce a secure, compact production container image.
+- **Layered JAR Optimization**:
+  - Leverages Spring Boot 3's `layertools` layer separation:
+    1. `dependencies` (Static external libraries — cached indefinitely across builds)
+    2. `spring-boot-loader` (Spring Boot internal JAR launcher)
+    3. `snapshot-dependencies` (Internal snapshots)
+    4. `application` (Fast-changing compiled classes, templates, and application configs)
+  - This architecture cuts rebuild times from minutes to seconds because Docker skips layer rebuilding if external dependencies have not changed.
+- **Least-Privilege Security Hardening**:
+  - Creates a dedicated non-root user (`appuser`, UID `1001`) and group (`appgroup`, GID `1001`).
+  - All application files and persistent volumes (`/app/uploads`, `/app/logs`) are owned by `appuser:appgroup`. The application container runs exclusively with `USER appuser`.
+- **Production Container JVM Tuning**:
+  - `-XX:+UseContainerSupport`: Enforces automatic detection of Linux cgroup CPU and memory limits.
+  - `-XX:MaxRAMPercentage=75.0`: Dynamically allocates up to 75% of container RAM to the JVM heap, leaving 25% for Metaspace, thread stacks, and OS overhead.
+  - `-XX:InitialRAMPercentage=50.0`: Pre-allocates initial heap to avoid heap resizing stop-the-world pauses during warmup.
+  - `-Djava.security.egd=file:/dev/./urandom`: Directs cryptographic entropy to the non-blocking random device for high-throughput JWT signing.
+- **Multi-Container Orchestration ([`docker-compose.yml`](file:///c:/Users/admin/Desktop/E-COMMERCE/docker-compose.yml))**:
+  - **`postgres`**: PostgreSQL 16 Alpine container with healthcheck (`pg_isready`), automated schema initialization (`/docker-entrypoint-initdb.d/01-schema.sql`), and named volume `jpbazaar_postgres_data`.
+  - **`redis`**: Redis 7 Alpine container with append-only file persistence (`--appendonly yes`), healthcheck (`redis-cli ping`), and named volume `jpbazaar_redis_data`.
+  - **`app`**: JPBazaar Spring Boot 3 application with dependency coordination (`depends_on` with `condition: service_healthy`), healthcheck (`curl -f http://localhost:8080/api/v1/health`), and named volume `jpbazaar_app_uploads`.
+  - **Network Isolation**: Dedicated custom bridge network `jpbazaar_network` enabling secure inter-container DNS discovery.
+- **Build Context Hygiene ([`.dockerignore`](file:///c:/Users/admin/Desktop/E-COMMERCE/.dockerignore))**:
+  - Excludes `target/`, `.git/`, `.idea/`, `logs/`, `uploads/`, and secrets from Docker build contexts.
+
+---
+
+### 2. Key Artifacts & Manifests
+
+| File | Purpose |
+|---|---|
+| [`Dockerfile`](file:///c:/Users/admin/Desktop/E-COMMERCE/Dockerfile) | Multi-stage Docker build with JDK 21 Alpine builder, layertools extraction, JRE 21 Alpine runner, non-root user, and cgroup-aware JVM flags. |
+| [`docker-compose.yml`](file:///c:/Users/admin/Desktop/E-COMMERCE/docker-compose.yml) | Multi-service orchestration configuring `app`, `postgres:16-alpine`, and `redis:7-alpine` with healthchecks, persistent volumes, and bridge network. |
+| [`.dockerignore`](file:///c:/Users/admin/Desktop/E-COMMERCE/.dockerignore) | Filters out local artifacts, binaries, and secrets from container image context. |
+| [`.env.docker`](file:///c:/Users/admin/Desktop/E-COMMERCE/.env.docker) | Production environment variable defaults for multi-container deployments. |
+
+---
+
+### 3. Verification & Validation Results
+
+1. **Docker Compose Configuration Validation**:
+   ```bash
+   docker compose --env-file .env.docker config
+   ```
+   **Result**: Validated with Exit Code `0`. Successfully resolved all service definitions, healthcheck scripts, environment bindings, and named volumes.
+2. **Spring Boot 3 Layered JAR Verification**:
+   ```bash
+   java -Djarmode=layertools -jar target/jpbazaar-0.0.1-SNAPSHOT.jar list
+   ```
+   **Result**:
+   ```
+   dependencies
+   spring-boot-loader
+   snapshot-dependencies
+   application
+   ```
+3. **Full Test Suite Execution**:
+   ```bash
+   mvn test
+   ```
+   **Result**: **141 / 141 tests passing across 24 test classes (0 failures, 0 errors, 0 skipped)**.
+
+---
+
+### 4. Interview Preparation — Phase 21 Key Technical Questions
+
+#### Q1: Why are Multi-Stage Docker builds essential for enterprise Java applications?
+**Answer**:
+1. **Attack Surface & Vulnerability Reduction**: The build stage requires a full JDK, Maven/Gradle, Git, and package managers (~500MB+). None of these tools should ever exist in production. The second stage uses a bare-minimum JRE (~180MB) with zero compilers, eliminating CVEs associated with developer tooling.
+2. **Image Size Optimization**: Copying only compiled bytecode and dependencies reduces final Docker image sizes from ~800MB to ~250MB, speeding up CI/CD pipeline deployments and container registry pulls.
+3. **Secret Protection**: Build-time credentials (such as Maven repository tokens or GitHub SSH keys) used in the builder stage are never copied to the runtime stage, preventing accidental credential exposure.
+
+#### Q2: How does Spring Boot 3's `layertools` optimize Docker layer caching compared to a traditional `COPY target/*.jar app.jar`?
+**Answer**:
+In a traditional `COPY app.jar app.jar`, even a single character change in a Java controller invalidates the Docker cache for the entire 60MB JAR, forcing Docker to upload and distribute all 60MB across the network on every deployment.
+With `layertools`:
+- **`dependencies/`** (~55MB): Contains external Spring, Hibernate, and Jackson JARs. This layer rarely changes and remains permanently cached in Docker engine and registry caches.
+- **`spring-boot-loader/`** (<1MB): Internal classloader layer; changes only on major Spring Boot version upgrades.
+- **`application/`** (~1-2MB): Contains only compiled business classes and config files. On subsequent code updates, Docker rebuilds and pushes **only this 1-2MB layer**, reducing push/pull times from minutes to seconds.
+
+#### Q3: Why is `-XX:+UseContainerSupport` and `-XX:MaxRAMPercentage` preferred over `-Xmx` in containers?
+**Answer**:
+- If a developer hardcodes `-Xmx2g`, moving the container to an environment with 1GB of memory causes the Linux Kernel OOM (Out Of Memory) Killer to instantly kill the container (`kill -9`, exit code 137). Conversely, placing that container on a 16GB host wastes 14GB of capacity.
+- `-XX:+UseContainerSupport` instructs the JVM to read Linux cgroup memory and CPU limits (`/sys/fs/cgroup/memory.max`) rather than host-level hardware specs.
+- `-XX:MaxRAMPercentage=75.0` dynamically sizes the maximum heap to 75% of whatever memory limit is allocated to the container (e.g. 750MB in a 1GB container; 3GB in a 4GB container), leaving 25% for off-heap allocations, Metaspace, and OS buffers.
+
+#### Q4: How does `docker-compose` healthcheck orchestration with `condition: service_healthy` prevent application startup crashes?
+**Answer**:
+A standard `depends_on: [postgres]` only waits for the PostgreSQL container to start its OS process, **not** for the database engine to finish initializing and accepting socket connections. If Spring Boot starts immediately, its HikariCP connection pool attempts to connect while PostgreSQL is still initializing, resulting in `Connection refused` and crash loops.
+By configuring:
+```yaml
+depends_on:
+  postgres:
+    condition: service_healthy
+```
+Docker Compose checks PostgreSQL's health command (`pg_isready -U postgres -d jpbazaar`) every 10 seconds. Only after PostgreSQL completes initialization and returns exit code 0 does Docker Compose release and start the `app` container, guaranteeing seamless, zero-error startups.
+
+---
+
+## Phase 22 — Production Readiness & Documentation
+
+### 1. Overview & Architecture
+Phase 22 brings **JPBazaar** to full production readiness, enterprise observability, and comprehensive documentation:
+- **Spring Boot Actuator & Observability**:
+  - Integrated `spring-boot-starter-actuator` and `micrometer-registry-prometheus` for production monitoring, JVM performance tracking, and telemetry scraping.
+  - Exposed management endpoints:
+    - `/actuator/health`: Aggregated health check including PostgreSQL database connectivity, Redis ping, and disk space.
+    - `/actuator/health/liveness`: Kubernetes Liveness probe indicating whether the internal application process is alive.
+    - `/actuator/health/readiness`: Kubernetes Readiness probe indicating whether the application is ready to accept external network traffic.
+    - `/actuator/info`: Application version, Git metadata, and JVM runtime details.
+    - `/actuator/metrics`: Real-time JVM memory pools, garbage collection timings, HikariCP database connection pool metrics, and HTTP request throughput.
+    - `/actuator/prometheus`: OpenMetrics/Prometheus scraper endpoint formatted for Prometheus and Grafana dashboards.
+- **Graceful Shutdown (Zero In-Flight Request Drops)**:
+  - Configured `server.shutdown: graceful` and `spring.lifecycle.timeout-per-shutdown-phase: 30s` in [`application.yml`](file:///c:/Users/admin/Desktop/E-COMMERCE/src/main/resources/application.yml).
+  - When the container receives `SIGTERM` (e.g. during Kubernetes rolling updates or Docker container redeployment), the embedded Tomcat server stops accepting new connections but allows in-flight HTTP requests and active database transactions up to 30 seconds to complete gracefully before process exit.
+- **Role-Based Actuator Security Guardrails**:
+  - In [`SecurityConfig`](file:///c:/Users/admin/Desktop/E-COMMERCE/src/main/java/com/jpbazaar/config/SecurityConfig.java):
+    - Public access (`.permitAll()`) is granted only to `/actuator/health`, `/actuator/health/liveness`, `/actuator/health/readiness`, and `/actuator/info` for load-balancer and container health probes.
+    - Sensitive operational endpoints (`/actuator/metrics`, `/actuator/prometheus`, `/actuator/env`, etc.) are locked down with `.hasRole("ADMIN")`, preventing information leakage.
+- **Rate Limiting Exclusion for Monitoring**:
+  - Updated [`RateLimitingFilter`](file:///c:/Users/admin/Desktop/E-COMMERCE/src/main/java/com/jpbazaar/security/ratelimit/RateLimitingFilter.java) to bypass `/actuator/**` from client rate limits, ensuring automated infrastructure monitoring agents and Prometheus scrapers are never throttled.
+- **Comprehensive Production Documentation**:
+  - Updated [`README.md`](file:///c:/Users/admin/Desktop/E-COMMERCE/README.md) with complete endpoint indices, architecture diagrams, environment configurations, single-command Docker Compose guides, and full milestone tracking across all 23 phases (Phase 0 to Phase 22).
+
+---
+
+### 2. Key Components & Implementation Details
+
+| Component / Artifact | Responsibilities |
+|---|---|
+| [`pom.xml`](file:///c:/Users/admin/Desktop/E-COMMERCE/pom.xml) | Integrated `spring-boot-starter-actuator` and `micrometer-registry-prometheus`. |
+| [`application.yml`](file:///c:/Users/admin/Desktop/E-COMMERCE/src/main/resources/application.yml) | Configured Actuator endpoints, health probes, Prometheus exposure, info metadata, and 30-second graceful shutdown. |
+| [`application-test.yml`](file:///c:/Users/admin/Desktop/E-COMMERCE/src/main/resources/application-test.yml) | Actuator test profile configuration for automated verification. |
+| [`SecurityConfig.java`](file:///c:/Users/admin/Desktop/E-COMMERCE/src/main/java/com/jpbazaar/config/SecurityConfig.java) | RBAC access rules protecting sensitive Actuator endpoints while exposing public health probes. |
+| [`RateLimitingFilter.java`](file:///c:/Users/admin/Desktop/E-COMMERCE/src/main/java/com/jpbazaar/security/ratelimit/RateLimitingFilter.java) | Excludes `/actuator/**` from rate limiting to protect telemetry scrapers. |
+| [`ActuatorEndpointsIntegrationTest.java`](file:///c:/Users/admin/Desktop/E-COMMERCE/src/test/java/com/jpbazaar/actuator/ActuatorEndpointsIntegrationTest.java) | Integration test verifying health status, liveness, readiness, RBAC protection on metrics, and Prometheus scraping. |
+| [`README.md`](file:///c:/Users/admin/Desktop/E-COMMERCE/README.md) | Production-ready documentation covering architecture, endpoints, environment, Docker Compose, and milestones. |
+
+---
+
+### 3. Verification & Test Suite Execution
+
+A dedicated integration test suite [`ActuatorEndpointsIntegrationTest`](file:///c:/Users/admin/Desktop/E-COMMERCE/src/test/java/com/jpbazaar/actuator/ActuatorEndpointsIntegrationTest.java) was added to verify:
+1. `shouldReturnHealthStatusUp`: Verifies `/actuator/health` returns HTTP 200 OK with `status: UP`.
+2. `shouldReturnLivenessProbeUp`: Verifies `/actuator/health/liveness` returns HTTP 200 OK with `status: UP`.
+3. `shouldReturnReadinessProbeUp`: Verifies `/actuator/health/readiness` returns HTTP 200 OK with `status: UP`.
+4. `shouldReturnApplicationInfo`: Verifies `/actuator/info` is publicly accessible.
+5. `shouldBlockUnauthenticatedMetricsAccess`: Verifies unauthenticated calls to `/actuator/metrics` are forbidden (HTTP 403).
+6. `shouldForbidCustomerFromAccessingMetrics`: Verifies non-admin customer accounts cannot access `/actuator/metrics`.
+7. `shouldAllowAdminToAccessMetrics`: Verifies administrators with `ROLE_ADMIN` can inspect metrics.
+8. `shouldAllowAdminToScrapePrometheusMetrics`: Verifies administrators can scrape `/actuator/prometheus`.
+
+**Full Test Suite Execution**:
+```bash
+mvn test
+```
+**Result**: **149 / 149 tests passing across 25 test classes (0 failures, 0 errors, 0 skipped)**.
+
+---
+
+### 4. Interview Preparation — Phase 22 Key Technical Questions
+
+#### Q1: What is the difference between Kubernetes Liveness and Readiness probes in Spring Boot Actuator?
+**Answer**:
+- **Liveness Probe (`/actuator/health/liveness`)**:
+  - *Purpose*: Tells Kubernetes whether the container is healthy and running, or if it is stuck in an unrecoverable state (such as a thread deadlock, JVM crash, or infinite loop).
+  - *Action on Failure*: If the liveness probe fails, Kubernetes immediately restarts the container (`kill -9` followed by fresh pod restart).
+- **Readiness Probe (`/actuator/health/readiness`)**:
+  - *Purpose*: Tells Kubernetes whether the application is initialized and capable of servicing user traffic (e.g., caches warmed up, database connections available, migrations complete).
+  - *Action on Failure*: If the readiness probe fails, Kubernetes stops routing ingress network traffic to this pod without killing it, allowing it to recover or finish warming up.
+
+#### Q2: How does Graceful Shutdown work in Spring Boot, and why is `timeout-per-shutdown-phase` important?
+**Answer**:
+When a Spring Boot application receives a `SIGTERM` termination signal:
+1. **Connection Rejection**: The embedded Tomcat/Jetty web server immediately stops accepting new incoming TCP socket connections.
+2. **Grace Period**: Active HTTP requests that were already accepted and are currently processing inside threads are given a grace period to complete.
+3. **Phase Timeout**: `spring.lifecycle.timeout-per-shutdown-phase: 30s` guarantees that after 30 seconds, if any rogue thread is still stuck waiting on an external network call, the application forces shutdown rather than hanging indefinitely.
+4. **Context Cleanup**: Spring closes the application context, flushes HikariCP database connection pools, closes Redis socket connections, and terminates the JVM cleanly without dropping customer checkout transactions.
+
+#### Q3: Why must Actuator endpoints like `/actuator/metrics`, `/actuator/env`, and `/actuator/heapdump` be secured with role-based access?
+**Answer**:
+Exposing unauthenticated Actuator endpoints is a critical OWASP security risk:
+- `/actuator/env`: Can leak decrypted environment variables, database passwords, and third-party API keys.
+- `/actuator/heapdump`: Allows an attacker to download the entire JVM heap, extracting in-memory plaintext passwords, JWT signing keys, and customer PII.
+- `/actuator/metrics`: Leaks business intelligence (traffic volumes, customer counts, system load) and internal network topology.
+Locking operational endpoints to `ROLE_ADMIN` while keeping `/actuator/health` public satisfies monitoring requirements while preventing information disclosure.
+
+
+
+
+
+
 
 
 

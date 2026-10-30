@@ -187,16 +187,25 @@ CREATE TABLE reviews (
 -- =============================================================================
 
 CREATE INDEX idx_users_email ON users(email);
+CREATE INDEX idx_users_role ON users(role);
+CREATE INDEX idx_users_created_at ON users(created_at);
 CREATE INDEX idx_addresses_user_id ON addresses(user_id);
 CREATE INDEX idx_products_category_id ON products(category_id);
 CREATE INDEX idx_products_active_price ON products(active, price);
 CREATE INDEX idx_products_sku ON products(sku);
+CREATE INDEX idx_products_brand ON products(brand);
+CREATE INDEX idx_products_active_stock ON products(active, stock_quantity);
+CREATE INDEX idx_products_rating ON products(rating);
 CREATE INDEX idx_product_images_product_id ON product_images(product_id);
+CREATE INDEX idx_product_images_prod_primary ON product_images(product_id, is_primary);
 CREATE INDEX idx_cart_items_cart_id ON cart_items(cart_id);
 CREATE INDEX idx_wishlist_items_wishlist_id ON wishlist_items(wishlist_id);
 CREATE INDEX idx_orders_user_id ON orders(user_id);
 CREATE INDEX idx_orders_status ON orders(status);
+CREATE INDEX idx_orders_created_at ON orders(created_at);
+CREATE INDEX idx_orders_status_created_at ON orders(status, created_at);
 CREATE INDEX idx_order_items_order_id ON order_items(order_id);
+CREATE INDEX idx_order_items_product_id ON order_items(product_id);
 CREATE INDEX idx_payments_order_id ON payments(order_id);
 CREATE INDEX idx_payments_transaction_id ON payments(transaction_id);
 CREATE INDEX idx_reviews_product_id ON reviews(product_id);

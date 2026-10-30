@@ -20,6 +20,10 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     @Query("SELECT p FROM Product p WHERE p.id = :id")
     Optional<Product> findByIdWithPessimisticLock(@Param("id") Long id);
 
+    @Override
+    @Query("SELECT p FROM Product p LEFT JOIN FETCH p.category WHERE p.id = :id")
+    Optional<Product> findById(@Param("id") Long id);
+
     Optional<Product> findBySku(String sku);
 
     boolean existsBySku(String sku);
@@ -28,10 +32,33 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 
     boolean existsByCategoryId(Long categoryId);
 
-    Page<Product> findByCategoryIdAndActiveTrue(Long categoryId, Pageable pageable);
+    @Query(value = "SELECT p FROM Product p LEFT JOIN FETCH p.category WHERE p.category.id = :categoryId AND p.active = true",
+           countQuery = "SELECT COUNT(p) FROM Product p WHERE p.category.id = :categoryId AND p.active = true")
+    Page<Product> findByCategoryIdAndActiveTrue(@Param("categoryId") Long categoryId, Pageable pageable);
 
-    @Query("""
+    long countByActiveTrue();
+
+    long countByStockQuantityLessThanEqualAndActiveTrue(Integer threshold);
+
+    @Query(value = "SELECT p FROM Product p LEFT JOIN FETCH p.category WHERE p.stockQuantity <= :threshold AND p.active = true ORDER BY p.stockQuantity ASC",
+           countQuery = "SELECT COUNT(p) FROM Product p WHERE p.stockQuantity <= :threshold AND p.active = true")
+    Page<Product> findLowStockProducts(@Param("threshold") Integer threshold, Pageable pageable);
+
+    @Query(value = """
             SELECT p FROM Product p
+            LEFT JOIN FETCH p.category
+            WHERE (:categoryId IS NULL OR p.category.id = :categoryId)
+              AND (:brand IS NULL OR LOWER(p.brand) = LOWER(:brand))
+              AND (:minPrice IS NULL OR p.price >= :minPrice)
+              AND (:maxPrice IS NULL OR p.price <= :maxPrice)
+              AND (:active IS NULL OR p.active = :active)
+              AND (:keyword IS NULL OR (
+                     LOWER(p.name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR
+                     LOWER(p.description) LIKE LOWER(CONCAT('%', :keyword, '%'))
+              ))
+            """,
+            countQuery = """
+            SELECT COUNT(p) FROM Product p
             WHERE (:categoryId IS NULL OR p.category.id = :categoryId)
               AND (:brand IS NULL OR LOWER(p.brand) = LOWER(:brand))
               AND (:minPrice IS NULL OR p.price >= :minPrice)

@@ -2,6 +2,7 @@ package com.jpbazaar.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.BatchSize;
 import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.OffsetDateTime;
@@ -34,6 +35,7 @@ public class Wishlist {
     private OffsetDateTime createdAt;
 
     @OneToMany(mappedBy = "wishlist", cascade = CascadeType.ALL, orphanRemoval = true)
+    @BatchSize(size = 25)
     @Builder.Default
     private List<WishlistItem> items = new ArrayList<>();
 

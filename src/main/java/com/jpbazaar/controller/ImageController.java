@@ -2,6 +2,8 @@ package com.jpbazaar.controller;
 
 import com.jpbazaar.service.storage.ImageStorageService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.core.io.Resource;
 import org.springframework.http.CacheControl;
@@ -17,7 +19,7 @@ import java.util.concurrent.TimeUnit;
 
 @RestController
 @RequestMapping("/api/images")
-@Tag(name = "Images", description = "Endpoints for serving uploaded images")
+@Tag(name = "Media Storage", description = "Public static media resource serving")
 public class ImageController {
 
     private final ImageStorageService imageStorageService;
@@ -27,8 +29,15 @@ public class ImageController {
     }
 
     @GetMapping("/{*filePath}")
-    @Operation(summary = "Serve uploaded image file (Public)")
-    public ResponseEntity<Resource> serveImage(@PathVariable String filePath) {
+    @Operation(summary = "Serve uploaded image file", description = "Serves an uploaded image resource with client-side caching headers.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Image file retrieved successfully"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Image file not found")
+    })
+    public ResponseEntity<Resource> serveImage(
+            @Parameter(description = "Relative path of the image file", example = "products/1/thumbnail.jpg")
+            @PathVariable String filePath
+    ) {
         String cleanPath = (filePath != null && filePath.startsWith("/")) ? filePath.substring(1) : filePath;
         Resource file = imageStorageService.loadAsResource(cleanPath);
         String contentType = imageStorageService.getContentType(file.getFilename());

@@ -1,0 +1,28 @@
+# Build artifacts
+target/
+*.jar
+*.war
+
+# IDE & Editor artifacts
+.idea/
+*.iml
+.vscode/
+.settings/
+.project
+.classpath
+
+# Git and logs
+.git/
+.gitignore
+*.log
+logs/
+
+# Local data & environment
+uploads/
+*.env
+.env
+.env.local
+.DS_Store
+
+# Test reports
+surefire-reports/

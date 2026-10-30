@@ -14,7 +14,8 @@ import java.util.Optional;
 @Repository
 public interface ReviewRepository extends JpaRepository<Review, Long> {
 
-    @Query("SELECT r FROM Review r LEFT JOIN FETCH r.user WHERE r.product.id = :productId")
+    @Query(value = "SELECT r FROM Review r LEFT JOIN FETCH r.user WHERE r.product.id = :productId",
+           countQuery = "SELECT COUNT(r) FROM Review r WHERE r.product.id = :productId")
     Page<Review> findByProductIdWithUser(@Param("productId") Long productId, Pageable pageable);
 
     Page<Review> findByProductId(Long productId, Pageable pageable);

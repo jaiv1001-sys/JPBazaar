@@ -16,4 +16,8 @@ public final class AppConstants {
 
     public static final String HEADER_AUTHORIZATION = "Authorization";
     public static final String TOKEN_PREFIX = "Bearer ";
+
+    public static final int DEFAULT_LOW_STOCK_THRESHOLD = 10;
+    public static final int DEFAULT_DASHBOARD_RECENT_LIMIT = 5;
+    public static final int DEFAULT_SALES_TREND_DAYS = 30;
 }

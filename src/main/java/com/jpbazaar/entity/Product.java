@@ -2,6 +2,7 @@ package com.jpbazaar.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.BatchSize;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
@@ -14,7 +15,10 @@ import java.util.List;
 @Table(name = "products", indexes = {
         @Index(name = "idx_products_category_id", columnList = "category_id"),
         @Index(name = "idx_products_active_price", columnList = "active, price"),
-        @Index(name = "idx_products_sku", columnList = "sku")
+        @Index(name = "idx_products_sku", columnList = "sku"),
+        @Index(name = "idx_products_brand", columnList = "brand"),
+        @Index(name = "idx_products_active_stock", columnList = "active, stock_quantity"),
+        @Index(name = "idx_products_rating", columnList = "rating")
 }, uniqueConstraints = {
         @UniqueConstraint(name = "uk_products_sku", columnNames = "sku")
 })
@@ -76,10 +80,12 @@ public class Product {
     private OffsetDateTime updatedAt;
 
     @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
+    @BatchSize(size = 25)
     @Builder.Default
     private List<ProductImage> images = new ArrayList<>();
 
     @OneToMany(mappedBy = "product")
+    @BatchSize(size = 25)
     @Builder.Default
     private List<Review> reviews = new ArrayList<>();
 

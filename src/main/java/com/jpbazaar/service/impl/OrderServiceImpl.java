@@ -172,7 +172,7 @@ public class OrderServiceImpl implements OrderService {
         if (status != null) {
             orderPage = orderRepository.findByStatus(status, pageable);
         } else {
-            orderPage = orderRepository.findAll(pageable);
+            orderPage = orderRepository.findAllWithDetails(pageable);
         }
 
         return PageResponse.from(orderPage, this::mapToOrderResponse);
