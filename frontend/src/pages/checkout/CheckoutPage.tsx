@@ -1,32 +1,643 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Address, PaymentMethod, Order, Payment } from '../../types';
+import { addressService } from '../../services/addressService';
+import { orderService } from '../../services/orderService';
+import { paymentService } from '../../services/paymentService';
+import { useCart } from '../../context/CartContext';
+import { useToast } from '../../context/ToastContext';
+import { AddressModal } from '../../components/account/AddressModal';
 import { Button } from '../../components/common/Button';
-import { Lock, ArrowLeft } from 'lucide-react';
+import { Input } from '../../components/common/Input';
+import { Skeleton } from '../../components/common/Skeleton';
+import {
+  MapPin,
+  CheckCircle,
+  CreditCard,
+  ShieldCheck,
+  Truck,
+  ArrowRight,
+  ArrowLeft,
+  AlertTriangle,
+  Lock,
+  Plus,
+  Building,
+} from 'lucide-react';
 
 export const CheckoutPage: React.FC = () => {
+  const { cart, totalAmount, totalCount, clearCart } = useCart();
+  const { showToast } = useToast();
+  const navigate = useNavigate();
+
+  // Step state: 1 (Address), 2 (Review), 3 (Payment), 4 (Confirmation)
+  const [currentStep, setCurrentStep] = useState<number>(1);
+
+  // Address state
+  const [addresses, setAddresses] = useState<Address[]>([]);
+  const [selectedAddressId, setSelectedAddressId] = useState<number | null>(null);
+  const [isLoadingAddresses, setIsLoadingAddresses] = useState<boolean>(true);
+  const [isAddressModalOpen, setIsAddressModalOpen] = useState<boolean>(false);
+
+  // Order Review state
+  const [deliveryNotes, setDeliveryNotes] = useState<string>('');
+
+  // Payment state
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('CARD');
+  const [simulateFailure, setSimulateFailure] = useState<boolean>(false);
+  const [isProcessingPayment, setIsProcessingPayment] = useState<boolean>(false);
+
+  // Card Inputs Mock
+  const [cardName, setCardName] = useState<string>('Alexander Vance');
+  const [cardNumber, setCardNumber] = useState<string>('•••• •••• •••• 4242');
+  const [cardExpiry, setCardExpiry] = useState<string>('12/28');
+  const [cardCvv, setCardCvv] = useState<string>('888');
+
+  // Confirmation state
+  const [completedOrder, setCompletedOrder] = useState<Order | null>(null);
+  const [completedPayment, setCompletedPayment] = useState<Payment | null>(null);
+
+  // Calculations
+  const shippingThreshold = 150;
+  const isFreeShipping = totalAmount >= shippingThreshold;
+  const shippingFee = totalAmount > 0 ? (isFreeShipping ? 0 : 25) : 0;
+  const finalTotal = totalAmount + shippingFee;
+
+  // Load addresses on mount
+  useEffect(() => {
+    addressService.getAddresses()
+      .then((data) => {
+        setAddresses(data);
+        const defaultAddr = data.find((a) => a.isDefault) || data[0];
+        if (defaultAddr) setSelectedAddressId(defaultAddr.id);
+      })
+      .catch((err) => {
+        console.error('Failed to load user addresses:', err);
+      })
+      .finally(() => {
+        setIsLoadingAddresses(false);
+      });
+  }, []);
+
+  // Redirect if cart is empty and not already confirmed
+  useEffect(() => {
+    if (currentStep !== 4 && totalCount === 0 && !completedOrder) {
+      navigate('/cart');
+    }
+  }, [currentStep, totalCount, completedOrder, navigate]);
+
+  const handleAddressSaved = (newAddr: Address) => {
+    setAddresses((prev) => {
+      const exists = prev.some((a) => a.id === newAddr.id);
+      if (exists) return prev.map((a) => (a.id === newAddr.id ? newAddr : a));
+      return [...prev, newAddr];
+    });
+    setSelectedAddressId(newAddr.id);
+  };
+
+  const handleStep1Next = () => {
+    if (!selectedAddressId) {
+      showToast('Please select or register a delivery residence.', 'error');
+      return;
+    }
+    setCurrentStep(2);
+  };
+
+  const handleStep2Next = () => {
+    setCurrentStep(3);
+  };
+
+  const handleFinalSettlement = async () => {
+    if (!selectedAddressId) {
+      showToast('Delivery residence missing.', 'error');
+      setCurrentStep(1);
+      return;
+    }
+
+    setIsProcessingPayment(true);
+    try {
+      // 1. Atomically place order from cart
+      const placedOrder = await orderService.placeOrder({
+        addressId: selectedAddressId,
+        paymentMethod: paymentMethod,
+        notes: deliveryNotes.trim() || undefined,
+      });
+
+      // 2. Process simulated payment
+      const paymentReceipt = await paymentService.processPayment({
+        orderId: placedOrder.id,
+        paymentMethod: paymentMethod,
+        simulateFailure: simulateFailure,
+      });
+
+      // 3. Clear cart from state
+      await clearCart();
+
+      setCompletedOrder(placedOrder);
+      setCompletedPayment(paymentReceipt);
+      setCurrentStep(4);
+      showToast('Consignment confirmed and cleared for priority dispatch.', 'success');
+    } catch (err: any) {
+      showToast(err.message || 'Settlement failed. Please verify credentials or retry.', 'error');
+    } finally {
+      setIsProcessingPayment(false);
+    }
+  };
+
+  const selectedAddress = addresses.find((a) => a.id === selectedAddressId);
+
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12 w-full">
-      <Link to="/cart" className="inline-flex items-center text-xs font-semibold tracking-wider uppercase text-luxury-gold hover:text-luxury-gold-light mb-8">
-        <ArrowLeft size={16} className="mr-2" /> Back to Bag
-      </Link>
+    <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10 w-full flex-1 flex flex-col">
+      {/* Checkout Progress Stepper */}
+      <div className="mb-10">
+        <div className="flex items-center justify-between max-w-2xl mx-auto relative">
+          <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-luxury-border -translate-y-1/2 z-0" />
 
-      <div className="border-b border-luxury-border pb-6 mb-8">
-        <span className="text-xs font-semibold tracking-luxury-widest uppercase text-luxury-gold">Secure Settlement</span>
-        <h1 className="font-serif text-3xl font-bold text-luxury-white mt-1">Checkout & Delivery Concierge</h1>
-      </div>
+          {[
+            { step: 1, label: 'Delivery Residence' },
+            { step: 2, label: 'Consignment Review' },
+            { step: 3, label: 'Settlement Protocol' },
+            { step: 4, label: 'Confirmation' },
+          ].map((s) => {
+            const isPassed = currentStep > s.step;
+            const isCurrent = currentStep === s.step;
 
-      <div className="bg-luxury-surface border border-luxury-border p-12 rounded-sm text-center">
-        <div className="w-16 h-16 rounded-full bg-luxury-elevated border border-luxury-border flex items-center justify-center mx-auto text-luxury-gold mb-4">
-          <Lock size={28} />
+            return (
+              <div key={s.step} className="relative z-10 flex flex-col items-center">
+                <div
+                  className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs transition-all ${
+                    isPassed
+                      ? 'bg-luxury-gold text-luxury-black'
+                      : isCurrent
+                      ? 'bg-luxury-gold text-luxury-black ring-4 ring-luxury-gold/20'
+                      : 'bg-luxury-surface border border-luxury-border text-luxury-muted'
+                  }`}
+                >
+                  {isPassed ? <CheckCircle size={16} /> : s.step}
+                </div>
+                <span
+                  className={`text-[10px] uppercase tracking-wider font-semibold mt-2 hidden sm:block ${
+                    isCurrent ? 'text-luxury-gold' : 'text-luxury-muted'
+                  }`}
+                >
+                  {s.label}
+                </span>
+              </div>
+            );
+          })}
         </div>
-        <h3 className="font-serif text-xl font-bold text-luxury-white">Encrypted Checkout Pipeline Ready</h3>
-        <p className="text-sm text-luxury-muted max-w-md mx-auto mt-2 mb-6">
-          Multi-step address selection, payment gateway simulation (CARD, UPI, NET_BANKING, COD), and order generation activate in Phase E.
-        </p>
-        <Link to="/products">
-          <Button variant="outline" size="sm">Continue Exploring</Button>
-        </Link>
       </div>
+
+      {/* STEP 1: Delivery Residence Selection */}
+      {currentStep === 1 && (
+        <div className="space-y-6">
+          <div className="border-b border-luxury-border pb-4 flex items-center justify-between">
+            <div>
+              <span className="text-xs font-semibold tracking-luxury-widest uppercase text-luxury-gold">
+                Step 1 of 3
+              </span>
+              <h2 className="font-serif text-2xl font-bold text-luxury-white mt-1">
+                Select Delivery Destination
+              </h2>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsAddressModalOpen(true)}
+              leftIcon={<Plus size={14} />}
+            >
+              Register New Residence
+            </Button>
+          </div>
+
+          {isLoadingAddresses ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Skeleton className="h-32 w-full" />
+              <Skeleton className="h-32 w-full" />
+            </div>
+          ) : addresses.length === 0 ? (
+            <div className="text-center py-16 bg-luxury-surface border border-luxury-border rounded-sm p-6">
+              <Building size={32} className="text-luxury-gold mx-auto mb-3" />
+              <h3 className="font-serif font-bold text-lg text-luxury-white">
+                No Registered Residences Found
+              </h3>
+              <p className="text-xs text-luxury-muted max-w-sm mx-auto mt-1 mb-6">
+                Register your primary residence or diplomatic address to proceed with dispatch.
+              </p>
+              <Button variant="gold" size="sm" onClick={() => setIsAddressModalOpen(true)}>
+                Add Delivery Address
+              </Button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {addresses.map((addr) => {
+                const isSelected = selectedAddressId === addr.id;
+                return (
+                  <div
+                    key={addr.id}
+                    onClick={() => setSelectedAddressId(addr.id)}
+                    className={`p-5 rounded-sm border cursor-pointer transition-all flex flex-col justify-between ${
+                      isSelected
+                        ? 'bg-luxury-surface border-luxury-gold shadow-gold-sm'
+                        : 'bg-luxury-surface/50 border-luxury-border hover:border-luxury-gold/40'
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs font-bold text-luxury-gold uppercase tracking-wider flex items-center gap-1.5">
+                          <MapPin size={14} />
+                          {addr.isDefault ? 'Primary Residence' : 'Alternative Destination'}
+                        </span>
+                        <div
+                          className={`w-4 h-4 rounded-full border flex items-center justify-center ${
+                            isSelected
+                              ? 'border-luxury-gold bg-luxury-gold text-luxury-black'
+                              : 'border-luxury-border'
+                          }`}
+                        >
+                          {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-luxury-black" />}
+                        </div>
+                      </div>
+                      <p className="font-medium text-sm text-luxury-white">{addr.addressLine}</p>
+                      <p className="text-xs text-luxury-muted mt-1">
+                        {addr.city}, {addr.state} {addr.postalCode}
+                      </p>
+                      <p className="text-xs text-luxury-subtle">{addr.country}</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          <div className="pt-6 border-t border-luxury-border flex justify-between items-center">
+            <Link to="/cart">
+              <Button variant="ghost" size="sm" leftIcon={<ArrowLeft size={16} />}>
+                Return to Bag
+              </Button>
+            </Link>
+            <Button
+              variant="gold"
+              size="md"
+              onClick={handleStep1Next}
+              disabled={!selectedAddressId}
+              rightIcon={<ArrowRight size={16} />}
+            >
+              Continue to Review
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* STEP 2: Consignment Review & Notes */}
+      {currentStep === 2 && (
+        <div className="space-y-6">
+          <div className="border-b border-luxury-border pb-4">
+            <span className="text-xs font-semibold tracking-luxury-widest uppercase text-luxury-gold">
+              Step 2 of 3
+            </span>
+            <h2 className="font-serif text-2xl font-bold text-luxury-white mt-1">
+              Review Consignment &amp; Dispatch Instructions
+            </h2>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="lg:col-span-2 space-y-4">
+              {/* Items Summary Table */}
+              <div className="bg-luxury-surface border border-luxury-border rounded-sm divide-y divide-luxury-border">
+                {cart?.items.map((item) => (
+                  <div key={item.id} className="p-4 flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      {item.imageUrl && (
+                        <img
+                          src={item.imageUrl}
+                          alt={item.productName}
+                          className="w-12 h-12 rounded-sm object-cover bg-luxury-elevated border border-luxury-border"
+                        />
+                      )}
+                      <div>
+                        <h4 className="font-serif font-bold text-sm text-luxury-white line-clamp-1">
+                          {item.productName}
+                        </h4>
+                        <span className="text-xs text-luxury-muted">
+                          Qty: {item.quantity} • ${item.price.toFixed(2)} each
+                        </span>
+                      </div>
+                    </div>
+                    <span className="font-serif font-bold text-sm text-luxury-white">
+                      ${item.subtotal.toFixed(2)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Delivery Instructions Input */}
+              <div className="bg-luxury-surface border border-luxury-border p-5 rounded-sm space-y-2">
+                <label className="text-xs font-semibold uppercase tracking-wider text-luxury-gold block">
+                  Concierge Delivery Instructions (Optional)
+                </label>
+                <textarea
+                  rows={2}
+                  value={deliveryNotes}
+                  onChange={(e) => setDeliveryNotes(e.target.value)}
+                  placeholder="e.g. Leave with residential concierge, ring bell upon arrival, white-glove setup..."
+                  className="w-full bg-luxury-elevated border border-luxury-border rounded-sm p-3 text-xs text-luxury-white placeholder:text-luxury-subtle focus:outline-none focus:border-luxury-gold"
+                  maxLength={500}
+                />
+              </div>
+            </div>
+
+            {/* Address Snapshot & Totals */}
+            <div className="space-y-4">
+              <div className="bg-luxury-surface border border-luxury-border p-5 rounded-sm space-y-3">
+                <h4 className="text-xs font-semibold uppercase tracking-wider text-luxury-gold flex items-center gap-1.5">
+                  <MapPin size={14} /> Dispatch Destination
+                </h4>
+                {selectedAddress && (
+                  <div className="text-xs text-luxury-muted leading-relaxed">
+                    <p className="font-bold text-luxury-white">{selectedAddress.addressLine}</p>
+                    <p>{selectedAddress.city}, {selectedAddress.state} {selectedAddress.postalCode}</p>
+                    <p>{selectedAddress.country}</p>
+                  </div>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setCurrentStep(1)}
+                  className="text-[11px] text-luxury-gold hover:underline font-semibold block"
+                >
+                  Change Destination
+                </button>
+              </div>
+
+              <div className="bg-luxury-surface border border-luxury-border p-5 rounded-sm space-y-3">
+                <h4 className="font-serif font-bold text-sm text-luxury-white pb-2 border-b border-luxury-border">
+                  Cost Summary
+                </h4>
+                <div className="flex justify-between text-xs text-luxury-muted">
+                  <span>Subtotal</span>
+                  <span className="text-luxury-white font-medium">${totalAmount.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-xs text-luxury-muted">
+                  <span>Insured Transport</span>
+                  <span className={isFreeShipping ? 'text-luxury-gold font-bold' : 'text-luxury-white'}>
+                    {isFreeShipping ? 'COMPLIMENTARY' : `$${shippingFee.toFixed(2)}`}
+                  </span>
+                </div>
+                <div className="border-t border-luxury-border pt-3 flex justify-between items-baseline font-serif">
+                  <span className="font-bold text-sm text-luxury-white">Total</span>
+                  <span className="font-bold text-xl text-luxury-gold">${finalTotal.toFixed(2)}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="pt-6 border-t border-luxury-border flex justify-between items-center">
+            <Button variant="ghost" size="sm" onClick={() => setCurrentStep(1)} leftIcon={<ArrowLeft size={16} />}>
+              Back to Address
+            </Button>
+            <Button variant="gold" size="md" onClick={handleStep2Next} rightIcon={<ArrowRight size={16} />}>
+              Proceed to Settlement
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* STEP 3: Settlement Protocol (Payment Method & Simulation) */}
+      {currentStep === 3 && (
+        <div className="space-y-6">
+          <div className="border-b border-luxury-border pb-4">
+            <span className="text-xs font-semibold tracking-luxury-widest uppercase text-luxury-gold">
+              Step 3 of 3
+            </span>
+            <h2 className="font-serif text-2xl font-bold text-luxury-white mt-1">
+              Encrypted Settlement Protocol
+            </h2>
+          </div>
+
+          {/* Simulated Disclaimer Banner */}
+          <div className="p-4 bg-luxury-surface border border-luxury-gold/50 rounded-sm flex items-start gap-3 text-xs text-luxury-muted">
+            <ShieldCheck size={20} className="text-luxury-gold shrink-0 mt-0.5" />
+            <div>
+              <strong className="text-luxury-gold font-bold block mb-0.5">
+                Simulated Gateway Demonstration Protocol
+              </strong>
+              JPBazaar operates a simulated transaction gateway. No financial credit or debit card is charged. Transactions are immediately reconciled with our Spring Boot order state machine.
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="lg:col-span-2 space-y-6">
+              {/* Payment Method Selector Tabs */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {[
+                  { id: 'CARD' as PaymentMethod, label: 'Credit Card', icon: CreditCard },
+                  { id: 'UPI' as PaymentMethod, label: 'Instant UPI', icon: Lock },
+                  { id: 'NET_BANKING' as PaymentMethod, label: 'Wire Transfer', icon: Building },
+                  { id: 'COD' as PaymentMethod, label: 'Consignment Handover', icon: Truck },
+                ].map((m) => {
+                  const Icon = m.icon;
+                  const isSelected = paymentMethod === m.id;
+                  return (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => setPaymentMethod(m.id)}
+                      className={`p-4 rounded-sm border text-center transition-all flex flex-col items-center justify-center gap-2 ${
+                        isSelected
+                          ? 'bg-luxury-surface border-luxury-gold shadow-gold-sm text-luxury-white'
+                          : 'bg-luxury-surface/40 border-luxury-border text-luxury-muted hover:text-luxury-white'
+                      }`}
+                    >
+                      <Icon size={20} className={isSelected ? 'text-luxury-gold' : 'text-luxury-muted'} />
+                      <span className="text-xs font-bold uppercase tracking-wider">{m.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Method Mock Input Details */}
+              <div className="bg-luxury-surface border border-luxury-border p-6 rounded-sm space-y-4">
+                {paymentMethod === 'CARD' && (
+                  <div className="space-y-4">
+                    <Input
+                      label="Cardholder Full Name"
+                      value={cardName}
+                      onChange={(e) => setCardName(e.target.value)}
+                    />
+                    <Input
+                      label="Simulated Card Number"
+                      value={cardNumber}
+                      onChange={(e) => setCardNumber(e.target.value)}
+                    />
+                    <div className="grid grid-cols-2 gap-4">
+                      <Input
+                        label="Expiry Date"
+                        value={cardExpiry}
+                        onChange={(e) => setCardExpiry(e.target.value)}
+                      />
+                      <Input
+                        label="CVV / CVC"
+                        type="password"
+                        value={cardCvv}
+                        onChange={(e) => setCardCvv(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {paymentMethod === 'UPI' && (
+                  <div className="space-y-3">
+                    <Input
+                      label="Virtual Payment Address (VPA / UPI ID)"
+                      defaultValue="patron@okjpbazaar"
+                    />
+                    <p className="text-[11px] text-luxury-muted">
+                      Approval notification simulated with instant clearance.
+                    </p>
+                  </div>
+                )}
+
+                {paymentMethod === 'NET_BANKING' && (
+                  <div className="space-y-3">
+                    <label className="text-xs text-luxury-muted block">Select Banking Institution</label>
+                    <select className="w-full bg-luxury-elevated border border-luxury-border rounded-sm p-2.5 text-xs text-luxury-white focus:outline-none focus:border-luxury-gold">
+                      <option>JP Morgan Private Client Banking</option>
+                      <option>Credit Suisse Geneva</option>
+                      <option>Barclays Wealth Management</option>
+                      <option>Standard Chartered Priority</option>
+                    </select>
+                  </div>
+                )}
+
+                {paymentMethod === 'COD' && (
+                  <div className="space-y-2 text-xs text-luxury-muted">
+                    <p className="font-semibold text-luxury-white">
+                      Complimentary White-Glove Handover Settlement
+                    </p>
+                    <p>
+                      Payment is settled in-person via certified draft or encrypted terminal upon final delivery inspection.
+                    </p>
+                  </div>
+                )}
+
+                {/* Developer / QA Simulator failure toggle */}
+                <div className="pt-4 border-t border-luxury-border flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="simFailureCheckbox"
+                    checked={simulateFailure}
+                    onChange={(e) => setSimulateFailure(e.target.checked)}
+                    className="w-4 h-4 rounded-sm border-luxury-border bg-luxury-surface text-luxury-danger focus:ring-luxury-danger"
+                  />
+                  <label htmlFor="simFailureCheckbox" className="text-xs text-luxury-muted cursor-pointer select-none flex items-center gap-1">
+                    <AlertTriangle size={14} className="text-amber-400" />
+                    <span>Test Gateway Error Recovery (Simulate Failure)</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            {/* Sidebar Final Amount */}
+            <div className="bg-luxury-surface border border-luxury-border p-6 rounded-sm space-y-6 h-fit">
+              <h4 className="font-serif font-bold text-base text-luxury-white pb-2 border-b border-luxury-border">
+                Settlement Authorization
+              </h4>
+              <div className="space-y-2 text-xs text-luxury-muted">
+                <div className="flex justify-between">
+                  <span>Method</span>
+                  <span className="text-luxury-gold font-bold">{paymentMethod}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Payable Amount</span>
+                  <span className="font-serif font-bold text-base text-luxury-white">${finalTotal.toFixed(2)}</span>
+                </div>
+              </div>
+
+              <Button
+                variant="gold"
+                size="lg"
+                fullWidth
+                onClick={handleFinalSettlement}
+                isLoading={isProcessingPayment}
+              >
+                Authorize Settlement • ${finalTotal.toFixed(2)}
+              </Button>
+            </div>
+          </div>
+
+          <div className="pt-6 border-t border-luxury-border flex justify-between items-center">
+            <Button variant="ghost" size="sm" onClick={() => setCurrentStep(2)} leftIcon={<ArrowLeft size={16} />}>
+              Back to Review
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* STEP 4: Confirmation & Receipt */}
+      {currentStep === 4 && completedOrder && (
+        <div className="bg-luxury-surface border border-luxury-border p-8 sm:p-12 rounded-sm text-center max-w-2xl mx-auto space-y-6 animate-fade-in">
+          <div className="w-20 h-20 rounded-full bg-luxury-gold/10 border border-luxury-gold/30 flex items-center justify-center text-luxury-gold mx-auto">
+            <CheckCircle size={40} />
+          </div>
+
+          <div>
+            <span className="text-xs font-semibold tracking-luxury-widest uppercase text-luxury-gold">
+              Consignment Confirmed
+            </span>
+            <h1 className="font-serif text-3xl sm:text-4xl font-bold text-luxury-white mt-2">
+              Acquisition Successful
+            </h1>
+            <p className="text-xs text-luxury-muted mt-2">
+              Order #{completedOrder.id} has been recorded in the database and approved for white-glove transport.
+            </p>
+          </div>
+
+          {/* Receipt Snapshot Card */}
+          <div className="bg-luxury-elevated border border-luxury-border p-6 rounded-sm text-left text-xs space-y-3">
+            <div className="flex justify-between border-b border-luxury-border pb-2">
+              <span className="text-luxury-muted">Consignment ID</span>
+              <span className="font-mono font-bold text-luxury-white">#{completedOrder.id}</span>
+            </div>
+            <div className="flex justify-between border-b border-luxury-border pb-2">
+              <span className="text-luxury-muted">Gateway Transaction ID</span>
+              <span className="font-mono font-bold text-luxury-gold">
+                {completedPayment?.transactionId || 'TXN_SIMULATED_CONFIRMED'}
+              </span>
+            </div>
+            <div className="flex justify-between border-b border-luxury-border pb-2">
+              <span className="text-luxury-muted">Monetary Total</span>
+              <span className="font-serif font-bold text-base text-luxury-white">
+                ${Number(completedOrder.totalAmount).toFixed(2)}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-luxury-muted">Delivery Destination</span>
+              <span className="text-luxury-white text-right max-w-xs font-medium">
+                {completedOrder.shippingAddress}
+              </span>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-center gap-4 pt-4">
+            <Link to="/account/orders">
+              <Button variant="gold" size="md">
+                Track in Acquisition History
+              </Button>
+            </Link>
+            <Link to="/products">
+              <Button variant="outline" size="md">
+                Return to Boutique
+              </Button>
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {/* Address Management Modal */}
+      <AddressModal
+        isOpen={isAddressModalOpen}
+        onClose={() => setIsAddressModalOpen(false)}
+        onSaved={handleAddressSaved}
+      />
     </div>
   );
 };

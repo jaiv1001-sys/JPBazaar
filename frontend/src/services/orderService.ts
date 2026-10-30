@@ -15,7 +15,7 @@ export const orderService = {
   },
 
   async cancelOrder(id: number): Promise<Order> {
-    return api.post(`/api/orders/${id}/cancel`);
+    return api.put(`/api/orders/${id}/cancel`);
   },
 
   async updateOrderStatus(id: number, data: UpdateOrderStatusRequest): Promise<Order> {

@@ -214,6 +214,7 @@ export interface OrderItem {
   price: number;
   quantity: number;
   subtotal: number;
+  imageUrl?: string;
 }
 
 export interface Order {
@@ -221,10 +222,12 @@ export interface Order {
   userId: number;
   userEmail: string;
   addressId: number;
-  shippingAddress?: Address;
+  shippingAddress: string;
   status: OrderStatus;
   totalAmount: number;
-  paymentMethod: PaymentMethod;
+  totalItemCount?: number;
+  paymentMethod?: PaymentMethod;
+  payment?: Payment;
   notes?: string;
   items: OrderItem[];
   createdAt: string;
