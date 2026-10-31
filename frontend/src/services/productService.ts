@@ -11,12 +11,17 @@ export interface ProductFilterParams {
   minPrice?: number;
   maxPrice?: number;
   active?: boolean;
+  inStock?: boolean;
   keyword?: string;
 }
 
 export const productService = {
   async getProducts(params?: ProductFilterParams): Promise<PageResponse<Product>> {
     return api.get('/api/products', { params });
+  },
+
+  async getBrands(): Promise<string[]> {
+    return api.get('/api/products/brands');
   },
 
   async getProductById(id: number): Promise<Product> {
@@ -29,6 +34,10 @@ export const productService = {
 
   async updateProduct(id: number, data: ProductUpdateRequest): Promise<Product> {
     return api.put(`/api/products/${id}`, data);
+  },
+
+  async updateProductStatus(id: number, active: boolean): Promise<Product> {
+    return api.patch(`/api/products/${id}/status`, null, { params: { active } });
   },
 
   async deleteProduct(id: number): Promise<void> {

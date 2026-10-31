@@ -16,6 +16,7 @@ import com.jpbazaar.repository.ProductRepository;
 import com.jpbazaar.service.ProductService;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -44,6 +45,7 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     @Transactional
+    @CacheEvict(value = "brands", allEntries = true)
     public ProductResponse createProduct(ProductCreateRequest request) {
         Category category = categoryRepository.findById(request.categoryId())
                 .orElseThrow(() -> new ResourceNotFoundException("Category not found with ID: " + request.categoryId()));
@@ -86,6 +88,7 @@ public class ProductServiceImpl implements ProductService {
             BigDecimal minPrice,
             BigDecimal maxPrice,
             Boolean active,
+            Boolean inStock,
             String keyword,
             Pageable pageable
     ) {
@@ -95,6 +98,7 @@ public class ProductServiceImpl implements ProductService {
                 minPrice,
                 maxPrice,
                 active,
+                inStock,
                 keyword,
                 pageable
         );
@@ -103,7 +107,10 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     @Transactional
-    @CacheEvict(value = "products", key = "#id")
+    @Caching(evict = {
+            @CacheEvict(value = "products", key = "#id"),
+            @CacheEvict(value = "brands", allEntries = true)
+    })
     public ProductResponse updateProduct(Long id, ProductUpdateRequest request) {
         Product product = getProductOrThrow(id);
 
@@ -145,6 +152,19 @@ public class ProductServiceImpl implements ProductService {
     @Override
     @Transactional
     @CacheEvict(value = "products", key = "#id")
+    public ProductResponse updateProductStatus(Long id, boolean active) {
+        Product product = getProductOrThrow(id);
+        product.setActive(active);
+        Product updatedProduct = productRepository.save(product);
+        return mapToProductResponse(updatedProduct);
+    }
+
+    @Override
+    @Transactional
+    @Caching(evict = {
+            @CacheEvict(value = "products", key = "#id"),
+            @CacheEvict(value = "brands", allEntries = true)
+    })
     public void deleteProduct(Long id) {
         Product product = getProductOrThrow(id);
 
@@ -153,6 +173,13 @@ public class ProductServiceImpl implements ProductService {
         }
 
         productRepository.delete(product);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    @Cacheable(value = "brands")
+    public List<String> getBrands() {
+        return productRepository.findDistinctBrands();
     }
 
     private Product getProductOrThrow(Long id) {

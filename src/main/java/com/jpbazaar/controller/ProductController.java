@@ -21,6 +21,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/products")
@@ -34,7 +35,7 @@ public class ProductController {
     }
 
     @GetMapping
-    @Operation(summary = "Search, filter, and paginate products", description = "Retrieves a paginated list of active products with multi-parameter filtering by category, brand, price range, and keyword (Public).")
+    @Operation(summary = "Search, filter, and paginate products", description = "Retrieves a paginated list of active products with multi-parameter filtering by category, brand, price range, in-stock status, and keyword (Public).")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Products retrieved successfully")
     })
@@ -48,6 +49,7 @@ public class ProductController {
             @Parameter(description = "Minimum price filter") @RequestParam(required = false) BigDecimal minPrice,
             @Parameter(description = "Maximum price filter") @RequestParam(required = false) BigDecimal maxPrice,
             @Parameter(description = "Filter by active status") @RequestParam(required = false) Boolean active,
+            @Parameter(description = "Filter by in-stock availability (true = stock > 0, false = out of stock)") @RequestParam(required = false) Boolean inStock,
             @Parameter(description = "Search keyword in product name or description") @RequestParam(required = false) String keyword
     ) {
         Sort sort = sortDir.equalsIgnoreCase("desc")
@@ -61,10 +63,21 @@ public class ProductController {
                 minPrice,
                 maxPrice,
                 active,
+                inStock,
                 keyword,
                 pageable
         );
         return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @GetMapping("/brands")
+    @Operation(summary = "Get distinct product brands (Public)", description = "Retrieves an alphabetized list of unique product brands available in the catalog (Public).")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Brands retrieved successfully")
+    })
+    public ResponseEntity<ApiResponse<List<String>>> getBrands() {
+        List<String> brands = productService.getBrands();
+        return ResponseEntity.ok(ApiResponse.success(brands));
     }
 
     @GetMapping("/{id}")
@@ -113,6 +126,23 @@ public class ProductController {
     ) {
         ProductResponse response = productService.updateProduct(id, request);
         return ResponseEntity.ok(ApiResponse.success("Product updated successfully", response));
+    }
+
+    @PatchMapping("/{id}/status")
+    @PreAuthorize("hasRole('ADMIN')")
+    @SecurityRequirement(name = "Bearer Authentication")
+    @Operation(summary = "Update product active status (Admin only)", description = "Activates or deactivates a product. Automatically evicts Redis cache. Requires ADMIN role.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Product status updated successfully"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Forbidden (Admin role required)"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Product not found")
+    })
+    public ResponseEntity<ApiResponse<ProductResponse>> updateProductStatus(
+            @Parameter(description = "Product ID", example = "1") @PathVariable Long id,
+            @Parameter(description = "Active status", example = "false") @RequestParam boolean active
+    ) {
+        ProductResponse response = productService.updateProductStatus(id, active);
+        return ResponseEntity.ok(ApiResponse.success("Product status updated successfully", response));
     }
 
     @DeleteMapping("/{id}")

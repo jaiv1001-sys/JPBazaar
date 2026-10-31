@@ -246,4 +246,78 @@ class ProductControllerTest {
         mockMvc.perform(get("/api/products/" + prodId))
                 .andExpect(status().isNotFound());
     }
+
+    @Test
+    void getBrands_Public_Success() throws Exception {
+        mockMvc.perform(get("/api/products/brands"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data").isArray());
+    }
+
+    @Test
+    void updateProductStatus_AsAdmin_Success() throws Exception {
+        String sku = "STATUS-SKU-" + System.currentTimeMillis();
+        ProductCreateRequest createReq = new ProductCreateRequest(
+                testCategoryId,
+                "Status Toggle Test Item",
+                "Testing active status toggle",
+                new BigDecimal("49.99"),
+                20,
+                sku,
+                "StatusBrand",
+                true
+        );
+
+        var createRes = mockMvc.perform(post("/api/products")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(createReq)))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        Long prodId = objectMapper.readTree(createRes.getResponse().getContentAsString())
+                .get("data").get("id").asLong();
+
+        // Deactivate via PATCH /status
+        mockMvc.perform(patch("/api/products/" + prodId + "/status")
+                        .param("active", "false")
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.active").value(false));
+
+        // Reactivate via PATCH /status
+        mockMvc.perform(patch("/api/products/" + prodId + "/status")
+                        .param("active", "true")
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.active").value(true));
+    }
+
+    @Test
+    void updateProductStatus_AsCustomer_Forbidden() throws Exception {
+        mockMvc.perform(patch("/api/products/1/status")
+                        .param("active", "false")
+                        .header("Authorization", "Bearer " + customerToken))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void searchAndFilterProducts_WithInStockFilter_Success() throws Exception {
+        mockMvc.perform(get("/api/products")
+                        .param("inStock", "true")
+                        .param("page", "0")
+                        .param("size", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.content").isArray());
+
+        mockMvc.perform(get("/api/products")
+                        .param("inStock", "false")
+                        .param("page", "0")
+                        .param("size", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.content").isArray());
+    }
 }
