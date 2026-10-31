@@ -1784,6 +1784,37 @@ Exposing unauthenticated Actuator endpoints is a critical OWASP security risk:
 - `/actuator/metrics`: Leaks business intelligence (traffic volumes, customer counts, system load) and internal network topology.
 Locking operational endpoints to `ROLE_ADMIN` while keeping `/actuator/health` public satisfies monitoring requirements while preventing information disclosure.
 
+---
+
+## Phase 8 — Prepare and Import the 260-Product Catalogue
+- **260-Product Catalogue Dataset (`data/catalogue_260_products.csv` & `data/catalogue_260_products.xlsx`)**:
+  - Generated exactly 260 high-quality products strictly across all 6 official departments:
+    - **Electronics**: 50 products (Flagship smartphones, M3 Max MacBooks, 4K OLED displays, cameras, smart speakers, mechanical keyboards, gaming laptops).
+    - **Fashion**: 50 products (Italian wool suits, designer trench coats, cashmere scarves, leather chelsea boots, silk shirts, tailored jackets).
+    - **Home & Living**: 40 products (Espresso machines, robotic vacuums, air purifiers, ergonomic mesh chairs, memory foam mattresses, stand mixers).
+    - **Accessories**: 40 products (Swiss automatic chronographs, polarized titanium sunglasses, leather weekenders, ANC headphones, minimalist wallets).
+    - **Beauty**: 40 products (Hyaluronic serums, luxury Eau de Parfum, botanical cleansing oils, vitamin C moisturizers, exfoliating masks).
+    - **Sports & Fitness**: 40 products (Smart fitness trackers, Olympic barbells, yoga mats, running shoes, carbon badminton rackets, rowing machines).
+  - All items feature:
+    - Unique department-prefixed SKUs (`ELEC-...`, `FASH-...`, `HOME-...`, `ACCS-...`, `BEAU-...`, `SPRT-...`).
+    - Standardized retail pricing (`Price` & `OriginalPrice` with realistic discount percentages).
+    - Rich specifications JSON metadata (Display, Processor, Weight, Material, Inseam, Fragrance Family, Resistance, etc.).
+    - Curated Unsplash product image URLs.
+- **Bulk Import Engine Generalization ([`BulkImportService.java`](file:///c:/Users/admin/Desktop/E-COMMERCE/src/main/java/com/jpbazaar/service/BulkImportService.java))**:
+  - Overloaded `previewImport(InputStream, String)` and `executeImport(InputStream, String)` allowing headless / programmatic invocation without requiring HTTP multipart wrappers.
+- **Application Seeder Enhancement ([`DataInitializer.java`](file:///c:/Users/admin/Desktop/E-COMMERCE/src/main/java/com/jpbazaar/config/DataInitializer.java))**:
+  - Automatically loads and seeds the comprehensive 260-product catalogue from classpath resource `/data/catalogue_260_products.csv` upon first boot when database is empty.
+  - Ensures all 6 department categories are seeded and verified.
+- **Excel Converter & Import Integration Test ([`Catalogue260ImportTest.java`](file:///c:/Users/admin/Desktop/E-COMMERCE/src/test/java/com/jpbazaar/service/Catalogue260ImportTest.java))**:
+  - `generateExcelFromCsvIfMissing`: Converts CSV to styled Excel (.xlsx) workbook with header styling and typed numeric cells.
+  - `testPreviewCsvAndXlsxCatalogue`: Previews both CSV and XLSX with 260 rows, 0 invalid rows, 0 duplicate SKUs, and `hasErrors = false`.
+  - `testExecuteImport260Catalogue`: Persists 260 products into database and asserts exact departmental counts (50, 50, 40, 40, 40, 40), primary images, and specifications JSON integrity.
+- **Verification & Test Results**:
+  - Backend test suite: **156 tests run, 0 failures, 0 errors, 0 skipped** (`BUILD SUCCESS`).
+  - Frontend production build: `tsc -b && vite build` built in 15.68s with **zero TypeScript errors**.
+  - Git Commit: `eed1810`.
+
+
 
 
 
