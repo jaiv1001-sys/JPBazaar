@@ -78,7 +78,7 @@ export const CartDrawer: React.FC = () => {
 
                   <div className="flex justify-between items-center mt-2">
                     <span className="text-sm font-bold text-luxury-gold">
-                      ${Number(item.subtotal || item.price * item.quantity).toFixed(2)}
+                      ${Number(item.subtotal ?? (Number(item.price ?? item.unitPrice ?? 0) * item.quantity)).toFixed(2)}
                     </span>
 
                     {/* Quantity Selector */}

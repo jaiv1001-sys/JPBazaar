@@ -7,6 +7,7 @@ import { paymentService } from '../../services/paymentService';
 import { useCart } from '../../context/CartContext';
 import { useToast } from '../../context/ToastContext';
 import { AddressModal } from '../../components/account/AddressModal';
+import { ErrorBoundary } from '../../components/common/ErrorBoundary';
 import { Button } from '../../components/common/Button';
 import { Input } from '../../components/common/Input';
 import { Skeleton } from '../../components/common/Skeleton';
@@ -25,7 +26,18 @@ import {
 } from 'lucide-react';
 
 export const CheckoutPage: React.FC = () => {
-  const { cart, totalAmount, totalCount, clearCart } = useCart();
+  return (
+    <ErrorBoundary
+      fallbackTitle="Checkout Concierge Disruption"
+      fallbackMessage="An unexpected issue occurred while rendering your checkout review. You can safely reload the screen or return to your bag."
+    >
+      <CheckoutContent />
+    </ErrorBoundary>
+  );
+};
+
+const CheckoutContent: React.FC = () => {
+  const { cart, guestItems, totalAmount, totalCount, clearCart } = useCart();
   const { showToast } = useToast();
   const navigate = useNavigate();
 
@@ -56,11 +68,15 @@ export const CheckoutPage: React.FC = () => {
   const [completedOrder, setCompletedOrder] = useState<Order | null>(null);
   const [completedPayment, setCompletedPayment] = useState<Payment | null>(null);
 
-  // Calculations
+  // Calculations (Safely guarded against null/undefined or NaN)
   const shippingThreshold = 150;
-  const isFreeShipping = totalAmount >= shippingThreshold;
-  const shippingFee = totalAmount > 0 ? (isFreeShipping ? 0 : 25) : 0;
-  const finalTotal = totalAmount + shippingFee;
+  const safeTotalAmount = Number(totalAmount || 0);
+  const isFreeShipping = safeTotalAmount >= shippingThreshold;
+  const shippingFee = safeTotalAmount > 0 ? (isFreeShipping ? 0 : 25) : 0;
+  const finalTotal = safeTotalAmount + shippingFee;
+
+  // Active items from server cart with guest cart fallback
+  const checkoutItems = (cart?.items && cart.items.length > 0) ? cart.items : (guestItems || []);
 
   // Load addresses on mount
   useEffect(() => {
@@ -99,10 +115,12 @@ export const CheckoutPage: React.FC = () => {
       showToast('Please select or register a delivery residence.', 'error');
       return;
     }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
     setCurrentStep(2);
   };
 
   const handleStep2Next = () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
     setCurrentStep(3);
   };
 
@@ -304,30 +322,40 @@ export const CheckoutPage: React.FC = () => {
             <div className="lg:col-span-2 space-y-4">
               {/* Items Summary Table */}
               <div className="bg-luxury-surface border border-luxury-border rounded-sm divide-y divide-luxury-border">
-                {cart?.items.map((item) => (
-                  <div key={item.id} className="p-4 flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-3">
-                      {item.imageUrl && (
-                        <img
-                          src={item.imageUrl}
-                          alt={item.productName}
-                          className="w-12 h-12 rounded-sm object-cover bg-luxury-elevated border border-luxury-border"
-                        />
-                      )}
-                      <div>
-                        <h4 className="font-serif font-bold text-sm text-luxury-white line-clamp-1">
-                          {item.productName}
-                        </h4>
-                        <span className="text-xs text-luxury-muted">
-                          Qty: {item.quantity} • ${item.price.toFixed(2)} each
+                {checkoutItems.length === 0 ? (
+                  <div className="p-6 text-center text-xs text-luxury-muted">
+                    No artifacts currently in checkout consignment.
+                  </div>
+                ) : (
+                  checkoutItems.map((item) => {
+                    const unitPrice = Number(item.price ?? item.unitPrice ?? 0);
+                    const subtotal = Number(item.subtotal ?? (unitPrice * item.quantity));
+                    return (
+                      <div key={item.id} className="p-4 flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-3">
+                          {item.imageUrl && (
+                            <img
+                              src={item.imageUrl}
+                              alt={item.productName}
+                              className="w-12 h-12 rounded-sm object-cover bg-luxury-elevated border border-luxury-border"
+                            />
+                          )}
+                          <div>
+                            <h4 className="font-serif font-bold text-sm text-luxury-white line-clamp-1">
+                              {item.productName}
+                            </h4>
+                            <span className="text-xs text-luxury-muted">
+                              Qty: {item.quantity} • ${unitPrice.toFixed(2)} each
+                            </span>
+                          </div>
+                        </div>
+                        <span className="font-serif font-bold text-sm text-luxury-white">
+                          ${subtotal.toFixed(2)}
                         </span>
                       </div>
-                    </div>
-                    <span className="font-serif font-bold text-sm text-luxury-white">
-                      ${item.subtotal.toFixed(2)}
-                    </span>
-                  </div>
-                ))}
+                    );
+                  })
+                )}
               </div>
 
               {/* Delivery Instructions Input */}
@@ -352,16 +380,21 @@ export const CheckoutPage: React.FC = () => {
                 <h4 className="text-xs font-semibold uppercase tracking-wider text-luxury-gold flex items-center gap-1.5">
                   <MapPin size={14} /> Dispatch Destination
                 </h4>
-                {selectedAddress && (
+                {selectedAddress ? (
                   <div className="text-xs text-luxury-muted leading-relaxed">
                     <p className="font-bold text-luxury-white">{selectedAddress.addressLine}</p>
                     <p>{selectedAddress.city}, {selectedAddress.state} {selectedAddress.postalCode}</p>
                     <p>{selectedAddress.country}</p>
                   </div>
+                ) : (
+                  <p className="text-xs text-luxury-muted italic">No delivery residence selected</p>
                 )}
                 <button
                   type="button"
-                  onClick={() => setCurrentStep(1)}
+                  onClick={() => {
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                    setCurrentStep(1);
+                  }}
                   className="text-[11px] text-luxury-gold hover:underline font-semibold block"
                 >
                   Change Destination
@@ -374,7 +407,7 @@ export const CheckoutPage: React.FC = () => {
                 </h4>
                 <div className="flex justify-between text-xs text-luxury-muted">
                   <span>Subtotal</span>
-                  <span className="text-luxury-white font-medium">${totalAmount.toFixed(2)}</span>
+                  <span className="text-luxury-white font-medium">${safeTotalAmount.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between text-xs text-luxury-muted">
                   <span>Insured Transport</span>
@@ -391,7 +424,15 @@ export const CheckoutPage: React.FC = () => {
           </div>
 
           <div className="pt-6 border-t border-luxury-border flex justify-between items-center">
-            <Button variant="ghost" size="sm" onClick={() => setCurrentStep(1)} leftIcon={<ArrowLeft size={16} />}>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+                setCurrentStep(1);
+              }}
+              leftIcon={<ArrowLeft size={16} />}
+            >
               Back to Address
             </Button>
             <Button variant="gold" size="md" onClick={handleStep2Next} rightIcon={<ArrowRight size={16} />}>
@@ -565,7 +606,15 @@ export const CheckoutPage: React.FC = () => {
           </div>
 
           <div className="pt-6 border-t border-luxury-border flex justify-between items-center">
-            <Button variant="ghost" size="sm" onClick={() => setCurrentStep(2)} leftIcon={<ArrowLeft size={16} />}>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+                setCurrentStep(2);
+              }}
+              leftIcon={<ArrowLeft size={16} />}
+            >
               Back to Review
             </Button>
           </div>

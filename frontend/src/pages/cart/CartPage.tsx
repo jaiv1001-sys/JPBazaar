@@ -120,7 +120,7 @@ export const CartPage: React.FC = () => {
                     {item.productName}
                   </Link>
                   <p className="text-xs text-luxury-muted">
-                    Unit Price: ${Number(item.price).toFixed(2)}
+                    Unit Price: ${Number(item.price ?? item.unitPrice ?? 0).toFixed(2)}
                   </p>
 
                   <div className="pt-2 flex items-center justify-center sm:justify-start gap-4">

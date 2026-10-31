@@ -57,8 +57,9 @@ public class UserServiceImpl implements UserService {
     }
 
     private User getUserByEmail(String email) {
-        return userRepository.findByEmail(email)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found with email: " + email));
+        String cleanEmail = email != null ? email.trim() : "";
+        return userRepository.findByEmailIgnoreCase(cleanEmail)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with email: " + cleanEmail));
     }
 
     private UserResponse mapToUserResponse(User user) {

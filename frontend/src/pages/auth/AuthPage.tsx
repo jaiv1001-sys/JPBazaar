@@ -38,18 +38,19 @@ export const AuthPage: React.FC = () => {
 
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!loginEmail || !loginPassword) {
+    const cleanEmail = loginEmail.trim().toLowerCase();
+    if (!cleanEmail || !loginPassword) {
       showToast('Please enter both email and password.', 'error');
       return;
     }
 
     try {
       setSubmitting(true);
-      await login({ email: loginEmail, password: loginPassword });
+      await login({ email: cleanEmail, password: loginPassword });
       showToast('Authenticated successfully. Welcome back to JPBazaar.', 'success');
       navigate(redirectPath, { replace: true });
     } catch (err: any) {
-      const msg = err.response?.data?.message || 'Authentication failed. Please verify credentials.';
+      const msg = err.message || err.response?.data?.message || 'Authentication failed. Please verify credentials.';
       showToast(msg, 'error');
     } finally {
       setSubmitting(false);
@@ -58,7 +59,8 @@ export const AuthPage: React.FC = () => {
 
   const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!regFirstName || !regLastName || !regEmail || !regPassword) {
+    const cleanEmail = regEmail.trim().toLowerCase();
+    if (!regFirstName.trim() || !regLastName.trim() || !cleanEmail || !regPassword) {
       showToast('Please complete all required fields.', 'error');
       return;
     }
@@ -66,16 +68,16 @@ export const AuthPage: React.FC = () => {
     try {
       setSubmitting(true);
       await register({
-        firstName: regFirstName,
-        lastName: regLastName,
-        email: regEmail,
+        firstName: regFirstName.trim(),
+        lastName: regLastName.trim(),
+        email: cleanEmail,
         password: regPassword,
-        phone: regPhone || undefined,
+        phone: regPhone?.trim() || undefined,
       });
       showToast('Account created and privileged token issued.', 'success');
       navigate(redirectPath, { replace: true });
     } catch (err: any) {
-      const msg = err.response?.data?.message || 'Registration failed. Please check inputs.';
+      const msg = err.message || err.response?.data?.message || 'Registration failed. Please check inputs.';
       showToast(msg, 'error');
     } finally {
       setSubmitting(false);

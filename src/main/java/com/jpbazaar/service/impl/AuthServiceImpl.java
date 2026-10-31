@@ -8,6 +8,8 @@ import com.jpbazaar.entity.Role;
 import com.jpbazaar.entity.User;
 import com.jpbazaar.entity.Wishlist;
 import com.jpbazaar.exception.DuplicateResourceException;
+import com.jpbazaar.exception.InvalidRequestException;
+import com.jpbazaar.exception.ResourceNotFoundException;
 import com.jpbazaar.repository.CartRepository;
 import com.jpbazaar.repository.UserRepository;
 import com.jpbazaar.repository.WishlistRepository;
@@ -49,16 +51,20 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Transactional
     public AuthResponse register(RegisterRequest request) {
-        if (userRepository.existsByEmail(request.email())) {
-            throw new DuplicateResourceException("User already exists with email: " + request.email());
+        String cleanEmail = request.email() != null ? request.email().trim().toLowerCase() : "";
+        if (cleanEmail.isBlank()) {
+            throw new InvalidRequestException("Email is required");
+        }
+        if (userRepository.existsByEmailIgnoreCase(cleanEmail)) {
+            throw new DuplicateResourceException("User already exists with email: " + cleanEmail);
         }
 
         User user = User.builder()
-                .firstName(request.firstName())
-                .lastName(request.lastName())
-                .email(request.email())
+                .firstName(request.firstName() != null ? request.firstName().trim() : "")
+                .lastName(request.lastName() != null ? request.lastName().trim() : "")
+                .email(cleanEmail)
                 .password(passwordEncoder.encode(request.password()))
-                .phone(request.phone())
+                .phone(request.phone() != null ? request.phone().trim() : null)
                 .role(Role.CUSTOMER)
                 .enabled(true)
                 .build();
@@ -73,7 +79,7 @@ public class AuthServiceImpl implements AuthService {
         wishlistRepository.save(wishlist);
 
         Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(request.email(), request.password())
+                new UsernamePasswordAuthenticationToken(cleanEmail, request.password())
         );
 
         String token = tokenProvider.generateToken(authentication);
@@ -90,14 +96,15 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Transactional(readOnly = true)
     public AuthResponse login(LoginRequest request) {
+        String cleanEmail = request.email() != null ? request.email().trim().toLowerCase() : "";
         Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(request.email(), request.password())
+                new UsernamePasswordAuthenticationToken(cleanEmail, request.password())
         );
 
         String token = tokenProvider.generateToken(authentication);
 
-        User user = userRepository.findByEmail(request.email())
-                .orElseThrow(() -> new DuplicateResourceException("User not found: " + request.email()));
+        User user = userRepository.findByEmailIgnoreCase(cleanEmail)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with email: " + cleanEmail));
 
         return AuthResponse.of(
                 token,

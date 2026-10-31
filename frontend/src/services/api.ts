@@ -56,7 +56,9 @@ api.interceptors.response.use(
         (typeof error.response.data === 'string' ? error.response.data : undefined) ||
         error.message;
 
-      return Promise.reject(new Error(serverMessage));
+      const customError = new Error(serverMessage);
+      (customError as any).response = error.response;
+      return Promise.reject(customError);
     }
 
     return Promise.reject(new Error(error.message || 'Network error occurred. Please check your connection.'));

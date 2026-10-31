@@ -20,8 +20,12 @@ public class CustomUserDetailsService implements UserDetailsService {
     @Override
     @Transactional(readOnly = true)
     public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + email));
+        if (email == null) {
+            throw new UsernameNotFoundException("Email cannot be null");
+        }
+        String cleanEmail = email.trim();
+        User user = userRepository.findByEmailIgnoreCase(cleanEmail)
+                .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + cleanEmail));
         return new SecurityUser(user);
     }
 }

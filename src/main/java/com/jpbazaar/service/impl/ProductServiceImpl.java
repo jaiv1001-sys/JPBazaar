@@ -92,14 +92,17 @@ public class ProductServiceImpl implements ProductService {
             String keyword,
             Pageable pageable
     ) {
+        String cleanBrand = (brand != null && !brand.trim().isEmpty()) ? brand.trim() : null;
+        String cleanKeyword = (keyword != null && !keyword.trim().isEmpty()) ? keyword.trim() : null;
+
         Page<Product> page = productRepository.searchAndFilterProducts(
                 categoryId,
-                brand,
+                cleanBrand,
                 minPrice,
                 maxPrice,
                 active,
                 inStock,
-                keyword,
+                cleanKeyword,
                 pageable
         );
         return PageResponse.from(page, this::mapToProductResponse);

@@ -27,7 +27,7 @@ public class UserController {
         this.userService = userService;
     }
 
-    @GetMapping("/me")
+    @GetMapping({"/me", "/profile"})
     @Operation(summary = "Get current user profile", description = "Fetches the profile details of the currently authenticated user.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "User profile retrieved successfully"),
@@ -38,7 +38,7 @@ public class UserController {
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
-    @PutMapping("/me")
+    @PutMapping({"/me", "/profile"})
     @Operation(summary = "Update current user profile", description = "Updates first name, last name, and phone number of the authenticated user.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Profile updated successfully"),

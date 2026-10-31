@@ -11,11 +11,11 @@ export const authService = {
   },
 
   async getProfile(): Promise<User> {
-    return api.get('/api/users/profile');
+    return api.get('/api/users/me');
   },
 
   async updateProfile(data: UpdateProfileRequest): Promise<User> {
-    return api.put('/api/users/profile', data);
+    return api.put('/api/users/me', data);
   },
 
   async getAddresses(): Promise<Address[]> {

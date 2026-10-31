@@ -55,27 +55,27 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
             SELECT p FROM Product p
             LEFT JOIN FETCH p.category
             WHERE (:categoryId IS NULL OR p.category.id = :categoryId)
-              AND (:brand IS NULL OR LOWER(p.brand) = LOWER(:brand))
+              AND (CAST(:brand AS string) IS NULL OR LOWER(p.brand) = LOWER(CAST(:brand AS string)))
               AND (:minPrice IS NULL OR p.price >= :minPrice)
               AND (:maxPrice IS NULL OR p.price <= :maxPrice)
               AND (:active IS NULL OR p.active = :active)
               AND (:inStock IS NULL OR (:inStock = true AND p.stockQuantity > 0) OR (:inStock = false AND p.stockQuantity = 0))
-              AND (:keyword IS NULL OR (
-                     LOWER(p.name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR
-                     LOWER(p.description) LIKE LOWER(CONCAT('%', :keyword, '%'))
+              AND (CAST(:keyword AS string) IS NULL OR (
+                     LOWER(p.name) LIKE LOWER(CONCAT('%', CAST(:keyword AS string), '%')) OR
+                     LOWER(p.description) LIKE LOWER(CONCAT('%', CAST(:keyword AS string), '%'))
               ))
             """,
             countQuery = """
             SELECT COUNT(p) FROM Product p
             WHERE (:categoryId IS NULL OR p.category.id = :categoryId)
-              AND (:brand IS NULL OR LOWER(p.brand) = LOWER(:brand))
+              AND (CAST(:brand AS string) IS NULL OR LOWER(p.brand) = LOWER(CAST(:brand AS string)))
               AND (:minPrice IS NULL OR p.price >= :minPrice)
               AND (:maxPrice IS NULL OR p.price <= :maxPrice)
               AND (:active IS NULL OR p.active = :active)
               AND (:inStock IS NULL OR (:inStock = true AND p.stockQuantity > 0) OR (:inStock = false AND p.stockQuantity = 0))
-              AND (:keyword IS NULL OR (
-                     LOWER(p.name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR
-                     LOWER(p.description) LIKE LOWER(CONCAT('%', :keyword, '%'))
+              AND (CAST(:keyword AS string) IS NULL OR (
+                     LOWER(p.name) LIKE LOWER(CONCAT('%', CAST(:keyword AS string), '%')) OR
+                     LOWER(p.description) LIKE LOWER(CONCAT('%', CAST(:keyword AS string), '%'))
               ))
             """)
     Page<Product> searchAndFilterProducts(
