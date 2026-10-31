@@ -14,6 +14,7 @@ import { categoryService } from '../../services/categoryService';
 import { useToast } from '../../context/ToastContext';
 import { ProductModal } from '../../components/admin/ProductModal';
 import { CategoryModal } from '../../components/admin/CategoryModal';
+import { ProductImageModal } from '../../components/admin/ProductImageModal';
 import { Button } from '../../components/common/Button';
 import { Badge } from '../../components/common/Badge';
 import { Input } from '../../components/common/Input';
@@ -34,6 +35,7 @@ import {
   ChevronRight,
   TrendingUp,
   RotateCcw,
+  Image as ImageIcon,
 } from 'lucide-react';
 
 export const AdminDashboardPage: React.FC = () => {
@@ -60,6 +62,8 @@ export const AdminDashboardPage: React.FC = () => {
   const [isLoadingProducts, setIsLoadingProducts] = useState(false);
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [productToEdit, setProductToEdit] = useState<Product | null>(null);
+  const [isImageModalOpen, setIsImageModalOpen] = useState(false);
+  const [productForImages, setProductForImages] = useState<Product | null>(null);
 
   // Categories State
   const [categories, setCategories] = useState<Category[]>([]);
@@ -725,6 +729,16 @@ export const AdminDashboardPage: React.FC = () => {
                         <div className="flex items-center justify-end gap-2">
                           <button
                             onClick={() => {
+                              setProductForImages(p);
+                              setIsImageModalOpen(true);
+                            }}
+                            className="p-1.5 text-luxury-muted hover:text-luxury-gold transition-colors"
+                            title="Manage Gallery Images"
+                          >
+                            <ImageIcon size={14} />
+                          </button>
+                          <button
+                            onClick={() => {
                               setProductToEdit(p);
                               setIsProductModalOpen(true);
                             }}
@@ -1000,6 +1014,20 @@ export const AdminDashboardPage: React.FC = () => {
         }}
         categories={categories}
         productToEdit={productToEdit}
+      />
+
+      {/* Product Image Gallery Modal */}
+      <ProductImageModal
+        isOpen={isImageModalOpen}
+        onClose={() => {
+          setIsImageModalOpen(false);
+          setProductForImages(null);
+        }}
+        product={productForImages}
+        onImagesUpdated={() => {
+          fetchProducts();
+          fetchStats();
+        }}
       />
 
       {/* Category Modal */}

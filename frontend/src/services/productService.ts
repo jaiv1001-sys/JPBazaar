@@ -44,10 +44,19 @@ export const productService = {
     return api.delete(`/api/products/${id}`);
   },
 
-  async uploadImage(productId: number, file: File): Promise<ProductImage> {
+  async getProductImages(productId: number): Promise<ProductImage[]> {
+    return api.get(`/api/products/${productId}/images`);
+  },
+
+  async addImageUrl(productId: number, imageUrl: string, isPrimary = false): Promise<ProductImage> {
+    return api.post(`/api/products/${productId}/images`, { imageUrl, isPrimary });
+  },
+
+  async uploadImage(productId: number, file: File, isPrimary = false): Promise<ProductImage> {
     const formData = new FormData();
     formData.append('file', file);
-    return api.post(`/api/products/${productId}/images`, formData, {
+    return api.post(`/api/products/${productId}/images/upload`, formData, {
+      params: { isPrimary },
       headers: { 'Content-Type': 'multipart/form-data' },
     });
   },
