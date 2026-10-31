@@ -15,6 +15,7 @@ import { useToast } from '../../context/ToastContext';
 import { ProductModal } from '../../components/admin/ProductModal';
 import { CategoryModal } from '../../components/admin/CategoryModal';
 import { ProductImageModal } from '../../components/admin/ProductImageModal';
+import { BulkImportView } from '../../components/admin/BulkImportView';
 import { Button } from '../../components/common/Button';
 import { Badge } from '../../components/common/Badge';
 import { Input } from '../../components/common/Input';
@@ -36,12 +37,13 @@ import {
   TrendingUp,
   RotateCcw,
   Image as ImageIcon,
+  FileSpreadsheet,
 } from 'lucide-react';
 
 export const AdminDashboardPage: React.FC = () => {
   const { showToast } = useToast();
 
-  const [activeTab, setActiveTab] = useState<'overview' | 'products' | 'categories' | 'orders'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'products' | 'categories' | 'orders' | 'import'>('overview');
 
   // Stats State
   const [stats, setStats] = useState<AdminDashboardStats | null>(null);
@@ -298,6 +300,7 @@ export const AdminDashboardPage: React.FC = () => {
           { id: 'products', label: 'Catalog Inventory', icon: Package },
           { id: 'categories', label: 'Departments', icon: Layers },
           { id: 'orders', label: 'Order Fulfillment', icon: ShoppingBag },
+          { id: 'import', label: 'Bulk Import', icon: FileSpreadsheet },
         ].map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
@@ -999,6 +1002,18 @@ export const AdminDashboardPage: React.FC = () => {
             </div>
           )}
         </div>
+      )}
+
+      {/* 5. BULK CATALOG IMPORT TAB */}
+      {activeTab === 'import' && (
+        <BulkImportView
+          onImportComplete={() => {
+            fetchProducts();
+            fetchStats();
+            fetchBrands();
+          }}
+          onNavigateToProducts={() => setActiveTab('products')}
+        />
       )}
 
       {/* Product Modal */}

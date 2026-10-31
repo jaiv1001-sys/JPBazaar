@@ -361,3 +361,39 @@ export interface AdminDashboardStats {
   topSellingProducts?: TopSellingProduct[];
   lowStockProducts?: LowStockProduct[];
 }
+
+// Bulk Import Engine
+export interface ProductImportRow {
+  rowNumber: number;
+  name: string;
+  categoryName: string;
+  brand?: string;
+  sku: string;
+  price?: number;
+  originalPrice?: number;
+  stockQuantity?: number;
+  description?: string;
+  specifications?: string;
+  imageUrl?: string;
+  valid: boolean;
+  errors: string[];
+}
+
+export interface BulkImportPreviewResponse {
+  totalRows: number;
+  validRows: number;
+  invalidRows: number;
+  duplicateSkusCount: number;
+  hasErrors: boolean;
+  rows: ProductImportRow[];
+}
+
+export interface BulkImportResultResponse {
+  totalProcessed: number;
+  successfullyImported: number;
+  failedRows: number;
+  importedProductIds: number[];
+  summaryMessage: string;
+  failureDetails: ProductImportRow[];
+}
+
