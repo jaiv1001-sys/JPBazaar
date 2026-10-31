@@ -8,6 +8,9 @@ spring:
     username: ${DB_USERNAME:postgres}
     password: ${DB_PASSWORD:root@jp}
 
+  cache:
+    type: ${CACHE_TYPE:simple}
+
   data:
     redis:
       host: ${REDIS_HOST:localhost}
