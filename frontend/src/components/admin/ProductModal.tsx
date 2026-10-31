@@ -6,7 +6,7 @@ import { Modal } from '../common/Modal';
 import { Input } from '../common/Input';
 import { Select } from '../common/Select';
 import { Button } from '../common/Button';
-import { Package, Tag, DollarSign } from 'lucide-react';
+import { Package, Tag, DollarSign, Plus, Trash2, Layers } from 'lucide-react';
 
 interface ProductModalProps {
   isOpen: boolean;
@@ -14,6 +14,11 @@ interface ProductModalProps {
   onSaved: (product: Product) => void;
   categories: Category[];
   productToEdit?: Product | null;
+}
+
+interface SpecItem {
+  key: string;
+  value: string;
 }
 
 export const ProductModal: React.FC<ProductModalProps> = ({
@@ -30,9 +35,11 @@ export const ProductModal: React.FC<ProductModalProps> = ({
   const [brand, setBrand] = useState('');
   const [sku, setSku] = useState('');
   const [price, setPrice] = useState<string>('');
+  const [originalPrice, setOriginalPrice] = useState<string>('');
   const [stockQuantity, setStockQuantity] = useState<string>('10');
   const [description, setDescription] = useState('');
   const [active, setActive] = useState(true);
+  const [specificationsList, setSpecificationsList] = useState<SpecItem[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -42,20 +49,74 @@ export const ProductModal: React.FC<ProductModalProps> = ({
       setBrand(productToEdit.brand || '');
       setSku(productToEdit.sku || '');
       setPrice(productToEdit.price.toString());
+      setOriginalPrice(productToEdit.originalPrice ? productToEdit.originalPrice.toString() : '');
       setStockQuantity(productToEdit.stockQuantity.toString());
       setDescription(productToEdit.description || '');
       setActive(productToEdit.active);
+
+      // Parse specifications
+      if (productToEdit.specifications) {
+        try {
+          const parsed = JSON.parse(productToEdit.specifications);
+          if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+            setSpecificationsList(
+              Object.entries(parsed).map(([k, v]) => ({ key: k, value: String(v) }))
+            );
+          } else if (Array.isArray(parsed)) {
+            setSpecificationsList(parsed);
+          } else {
+            setSpecificationsList([{ key: 'Attributes', value: String(parsed) }]);
+          }
+        } catch {
+          // If plain text format, split lines by colon
+          const lines = productToEdit.specifications.split('\n').filter((l) => l.trim().length > 0);
+          const pairs: SpecItem[] = lines.map((line) => {
+            const idx = line.indexOf(':');
+            return idx !== -1
+              ? { key: line.substring(0, idx).trim(), value: line.substring(idx + 1).trim() }
+              : { key: 'Detail', value: line.trim() };
+          });
+          setSpecificationsList(pairs.length > 0 ? pairs : []);
+        }
+      } else {
+        setSpecificationsList([]);
+      }
     } else {
       setName('');
       setCategoryId(categories[0]?.id || 1);
       setBrand('');
       setSku('');
       setPrice('');
+      setOriginalPrice('');
       setStockQuantity('10');
       setDescription('');
       setActive(true);
+      setSpecificationsList([]);
     }
   }, [productToEdit, categories, isOpen]);
+
+  // Live calculated discount percentage
+  const numPrice = parseFloat(price);
+  const numOrigPrice = parseFloat(originalPrice);
+  const calculatedDiscount =
+    !isNaN(numPrice) && !isNaN(numOrigPrice) && numOrigPrice > numPrice && numOrigPrice > 0
+      ? Math.round(((numOrigPrice - numPrice) / numOrigPrice) * 100)
+      : null;
+
+  // Specification Builder actions
+  const handleAddSpecRow = () => {
+    setSpecificationsList((prev) => [...prev, { key: '', value: '' }]);
+  };
+
+  const handleUpdateSpec = (index: number, field: 'key' | 'value', val: string) => {
+    setSpecificationsList((prev) =>
+      prev.map((item, idx) => (idx === index ? { ...item, [field]: val } : item))
+    );
+  };
+
+  const handleRemoveSpec = (index: number) => {
+    setSpecificationsList((prev) => prev.filter((_, idx) => idx !== index));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -64,12 +125,29 @@ export const ProductModal: React.FC<ProductModalProps> = ({
       return;
     }
 
-    const numPrice = Number(price);
-    const numStock = parseInt(stockQuantity, 10);
+    const parsedPrice = Number(price);
+    const parsedStock = parseInt(stockQuantity, 10);
+    const parsedOriginalPrice = originalPrice.trim() ? Number(originalPrice) : undefined;
 
-    if (isNaN(numPrice) || numPrice <= 0) {
+    if (isNaN(parsedPrice) || parsedPrice <= 0) {
       showToast('Please specify a valid monetary price.', 'error');
       return;
+    }
+
+    if (parsedOriginalPrice !== undefined && (isNaN(parsedOriginalPrice) || parsedOriginalPrice < 0)) {
+      showToast('Please specify a valid non-negative original price.', 'error');
+      return;
+    }
+
+    // Build specifications JSON
+    let serializedSpecs: string | undefined = undefined;
+    const validSpecs = specificationsList.filter((s) => s.key.trim().length > 0);
+    if (validSpecs.length > 0) {
+      const specObj: Record<string, string> = {};
+      validSpecs.forEach((s) => {
+        specObj[s.key.trim()] = s.value.trim();
+      });
+      serializedSpecs = JSON.stringify(specObj);
     }
 
     setIsSubmitting(true);
@@ -81,8 +159,10 @@ export const ProductModal: React.FC<ProductModalProps> = ({
           categoryId,
           brand: brand.trim() || undefined,
           sku: sku.trim(),
-          price: numPrice,
-          stockQuantity: numStock,
+          price: parsedPrice,
+          originalPrice: parsedOriginalPrice,
+          specifications: serializedSpecs,
+          stockQuantity: parsedStock,
           description: description.trim() || undefined,
           active,
         };
@@ -94,8 +174,10 @@ export const ProductModal: React.FC<ProductModalProps> = ({
           categoryId,
           brand: brand.trim() || undefined,
           sku: sku.trim(),
-          price: numPrice,
-          stockQuantity: numStock,
+          price: parsedPrice,
+          originalPrice: parsedOriginalPrice,
+          specifications: serializedSpecs,
+          stockQuantity: parsedStock,
           description: description.trim() || undefined,
           active,
         };
@@ -115,7 +197,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      maxWidth="xl"
+      maxWidth="2xl"
       title={productToEdit ? 'Amend Catalog Artifact' : 'Catalog New Luxury Artifact'}
     >
       <form onSubmit={handleSubmit} className="space-y-4 py-2">
@@ -141,7 +223,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({
 
           <Input
             label="Brand / Atelier"
-            placeholder="e.g. Sony, Apple, Rolex..."
+            placeholder="e.g. Sony, Apple, Rolex, BoAt..."
             value={brand}
             onChange={(e) => setBrand(e.target.value)}
             leftIcon={<Tag size={16} />}
@@ -151,23 +233,42 @@ export const ProductModal: React.FC<ProductModalProps> = ({
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <Input
             label="Stock Keeping Unit (SKU)"
-            placeholder="e.g. SONY-XM5-BLK"
+            placeholder="e.g. ELEC-SONY-001"
             value={sku}
             onChange={(e) => setSku(e.target.value.toUpperCase())}
             required
           />
 
+          <div>
+            <Input
+              label="Selling Price"
+              type="number"
+              step="0.01"
+              placeholder="199.99"
+              value={price}
+              onChange={(e) => setPrice(e.target.value)}
+              leftIcon={<DollarSign size={16} />}
+              required
+            />
+            {calculatedDiscount !== null && (
+              <span className="inline-block mt-1 text-[11px] font-bold text-emerald-400 bg-emerald-950/60 border border-emerald-500/30 px-2 py-0.5 rounded-sm">
+                {calculatedDiscount}% OFF
+              </span>
+            )}
+          </div>
+
           <Input
-            label="Price ($ USD)"
+            label="Original Price / MRP"
             type="number"
             step="0.01"
-            placeholder="399.99"
-            value={price}
-            onChange={(e) => setPrice(e.target.value)}
+            placeholder="249.99"
+            value={originalPrice}
+            onChange={(e) => setOriginalPrice(e.target.value)}
             leftIcon={<DollarSign size={16} />}
-            required
           />
+        </div>
 
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Input
             label="Warehouse Stock"
             type="number"
@@ -176,30 +277,84 @@ export const ProductModal: React.FC<ProductModalProps> = ({
             onChange={(e) => setStockQuantity(e.target.value)}
             required
           />
+
+          <div className="flex items-center gap-2 pt-6">
+            <input
+              type="checkbox"
+              id="activeCheckbox"
+              checked={active}
+              onChange={(e) => setActive(e.target.checked)}
+              className="w-4 h-4 rounded-sm border-luxury-border bg-luxury-surface text-luxury-gold focus:ring-luxury-gold"
+            />
+            <label htmlFor="activeCheckbox" className="text-xs text-luxury-muted select-none cursor-pointer">
+              Publish actively in public storefront catalog
+            </label>
+          </div>
         </div>
 
         <div className="space-y-1">
-          <label className="text-xs text-luxury-muted block">Artifact Narrative &amp; Specifications</label>
+          <label className="text-xs text-luxury-muted block">Artifact Narrative &amp; Description</label>
           <textarea
             rows={3}
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="Provide architectural specifications, materials, acoustic tuning, etc..."
+            placeholder="Provide architectural narrative, craftsmanship details, materials..."
             className="w-full bg-luxury-elevated border border-luxury-border rounded-sm p-3 text-xs text-luxury-white placeholder:text-luxury-subtle focus:outline-none focus:border-luxury-gold"
           />
         </div>
 
-        <div className="flex items-center gap-2 pt-2">
-          <input
-            type="checkbox"
-            id="activeCheckbox"
-            checked={active}
-            onChange={(e) => setActive(e.target.checked)}
-            className="w-4 h-4 rounded-sm border-luxury-border bg-luxury-surface text-luxury-gold focus:ring-luxury-gold"
-          />
-          <label htmlFor="activeCheckbox" className="text-xs text-luxury-muted select-none cursor-pointer">
-            Publish actively in public storefront catalog
-          </label>
+        {/* Specifications Key-Value Builder */}
+        <div className="space-y-2 pt-2 border-t border-luxury-border/60">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-semibold text-luxury-gold uppercase tracking-wider flex items-center gap-1.5">
+              <Layers size={14} />
+              Technical Specifications &amp; Attributes
+            </label>
+            <Button
+              type="button"
+              variant="dark"
+              size="sm"
+              onClick={handleAddSpecRow}
+              leftIcon={<Plus size={12} />}
+            >
+              Add Spec
+            </Button>
+          </div>
+
+          {specificationsList.length === 0 ? (
+            <p className="text-[11px] text-luxury-muted italic py-1">
+              No custom specifications configured. Click "Add Spec" to add attributes (e.g. Battery: 30h, Connectivity: Bluetooth 5.2).
+            </p>
+          ) : (
+            <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+              {specificationsList.map((item, idx) => (
+                <div key={idx} className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    placeholder="Attribute (e.g. Material)"
+                    value={item.key}
+                    onChange={(e) => handleUpdateSpec(idx, 'key', e.target.value)}
+                    className="flex-1 bg-luxury-elevated border border-luxury-border rounded-sm px-2.5 py-1.5 text-xs text-luxury-white placeholder:text-luxury-subtle focus:outline-none focus:border-luxury-gold"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Value (e.g. Italian Leather)"
+                    value={item.value}
+                    onChange={(e) => handleUpdateSpec(idx, 'value', e.target.value)}
+                    className="flex-1 bg-luxury-elevated border border-luxury-border rounded-sm px-2.5 py-1.5 text-xs text-luxury-white placeholder:text-luxury-subtle focus:outline-none focus:border-luxury-gold"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveSpec(idx)}
+                    className="p-1.5 text-luxury-muted hover:text-rose-400 transition-colors"
+                    title="Remove specification"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="flex justify-end gap-3 pt-6 border-t border-luxury-border">

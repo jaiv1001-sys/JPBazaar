@@ -33,6 +33,7 @@ import {
   ExternalLink,
   ChevronRight,
   TrendingUp,
+  RotateCcw,
 } from 'lucide-react';
 
 export const AdminDashboardPage: React.FC = () => {
@@ -48,6 +49,14 @@ export const AdminDashboardPage: React.FC = () => {
   const [productsData, setProductsData] = useState<PageResponse<Product> | null>(null);
   const [productSearch, setProductSearch] = useState('');
   const [productPage, setProductPage] = useState(0);
+  const [productCategoryFilter, setProductCategoryFilter] = useState<string>('');
+  const [productBrandFilter, setProductBrandFilter] = useState<string>('');
+  const [productStockFilter, setProductStockFilter] = useState<'all' | 'inStock' | 'lowStock' | 'outOfStock'>('all');
+  const [productStatusFilter, setProductStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
+  const [productSortBy, setProductSortBy] = useState<string>('id');
+  const [productSortDir, setProductSortDir] = useState<'asc' | 'desc'>('desc');
+  const [brands, setBrands] = useState<string[]>([]);
+  const [togglingProductId, setTogglingProductId] = useState<number | null>(null);
   const [isLoadingProducts, setIsLoadingProducts] = useState(false);
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [productToEdit, setProductToEdit] = useState<Product | null>(null);
@@ -79,24 +88,65 @@ export const AdminDashboardPage: React.FC = () => {
     }
   }, [showToast]);
 
+  // Load Brands
+  const fetchBrands = useCallback(async () => {
+    try {
+      const data = await productService.getBrands();
+      setBrands(data);
+    } catch (err: any) {
+      console.error('Failed to load catalog brands:', err);
+    }
+  }, []);
+
   // Load Products
   const fetchProducts = useCallback(async () => {
     setIsLoadingProducts(true);
     try {
+      let inStockParam: boolean | undefined = undefined;
+      if (productStockFilter === 'inStock') inStockParam = true;
+      if (productStockFilter === 'outOfStock') inStockParam = false;
+
+      let activeParam: boolean | undefined = undefined;
+      if (productStatusFilter === 'active') activeParam = true;
+      if (productStatusFilter === 'inactive') activeParam = false;
+
       const data = await productService.getProducts({
         page: productPage,
         size: 10,
         keyword: productSearch.trim() || undefined,
-        sortBy: 'id',
-        sortDir: 'desc',
+        categoryId: productCategoryFilter ? Number(productCategoryFilter) : undefined,
+        brand: productBrandFilter || undefined,
+        active: activeParam,
+        inStock: inStockParam,
+        sortBy: productSortBy,
+        sortDir: productSortDir,
       });
-      setProductsData(data);
+
+      if (productStockFilter === 'lowStock') {
+        const filteredContent = data.content.filter((p) => p.stockQuantity <= 10);
+        setProductsData({
+          ...data,
+          content: filteredContent,
+          totalElements: filteredContent.length,
+        });
+      } else {
+        setProductsData(data);
+      }
     } catch (err: any) {
       console.error('Failed to load products for admin:', err);
     } finally {
       setIsLoadingProducts(false);
     }
-  }, [productPage, productSearch]);
+  }, [
+    productPage,
+    productSearch,
+    productCategoryFilter,
+    productBrandFilter,
+    productStockFilter,
+    productStatusFilter,
+    productSortBy,
+    productSortDir,
+  ]);
 
   // Load Categories
   const fetchCategories = useCallback(async () => {
@@ -127,13 +177,46 @@ export const AdminDashboardPage: React.FC = () => {
   useEffect(() => {
     fetchStats();
     fetchCategories();
-  }, [fetchStats, fetchCategories]);
+    fetchBrands();
+  }, [fetchStats, fetchCategories, fetchBrands]);
 
   useEffect(() => {
     if (activeTab === 'products') fetchProducts();
     if (activeTab === 'categories') fetchCategories();
     if (activeTab === 'orders') fetchOrders();
   }, [activeTab, fetchProducts, fetchCategories, fetchOrders]);
+
+  // Product Actions
+  const handleToggleProductStatus = async (id: number, currentActive: boolean, name: string) => {
+    setTogglingProductId(id);
+    try {
+      const updated = await productService.updateProductStatus(id, !currentActive);
+      showToast(`Artifact "${name}" status updated to ${updated.active ? 'Active' : 'Archived'}.`, 'success');
+      setProductsData((prev) => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          content: prev.content.map((p) => (p.id === id ? { ...p, active: updated.active } : p)),
+        };
+      });
+      fetchStats();
+    } catch (err: any) {
+      showToast(err.message || 'Failed to toggle status.', 'error');
+    } finally {
+      setTogglingProductId(null);
+    }
+  };
+
+  const handleResetProductFilters = () => {
+    setProductSearch('');
+    setProductCategoryFilter('');
+    setProductBrandFilter('');
+    setProductStockFilter('all');
+    setProductStatusFilter('all');
+    setProductSortBy('id');
+    setProductSortDir('desc');
+    setProductPage(0);
+  };
 
   // Product Actions
   const handleDeleteProduct = async (id: number, name: string) => {
@@ -397,31 +480,122 @@ export const AdminDashboardPage: React.FC = () => {
 
       {/* 2. PRODUCT CATALOG MANAGEMENT TAB */}
       {activeTab === 'products' && (
-        <div className="space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-luxury-surface p-4 border border-luxury-border rounded-sm">
-            <div className="flex-1 max-w-sm relative">
-              <Input
-                type="text"
-                placeholder="Search catalog by name, brand, SKU..."
-                value={productSearch}
+        <div className="space-y-4">
+          {/* Action & Filter Bar */}
+          <div className="bg-luxury-surface p-4 border border-luxury-border rounded-sm space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex-1 max-w-md relative">
+                <Input
+                  type="text"
+                  placeholder="Search catalog by name, brand, SKU..."
+                  value={productSearch}
+                  onChange={(e) => {
+                    setProductSearch(e.target.value);
+                    setProductPage(0);
+                  }}
+                  leftIcon={<Search size={14} />}
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="gold"
+                  size="sm"
+                  onClick={() => {
+                    setProductToEdit(null);
+                    setIsProductModalOpen(true);
+                  }}
+                  leftIcon={<Plus size={14} />}
+                >
+                  Add New Artifact
+                </Button>
+              </div>
+            </div>
+
+            {/* Filter & Sort Controls */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 pt-2 border-t border-luxury-border/60">
+              <Select
+                label=""
+                value={productCategoryFilter}
                 onChange={(e) => {
-                  setProductSearch(e.target.value);
+                  setProductCategoryFilter(e.target.value);
                   setProductPage(0);
                 }}
-                leftIcon={<Search size={14} />}
+                options={[
+                  { value: '', label: 'All Departments' },
+                  ...categories.map((c) => ({ value: String(c.id), label: c.name })),
+                ]}
               />
+
+              <Select
+                label=""
+                value={productBrandFilter}
+                onChange={(e) => {
+                  setProductBrandFilter(e.target.value);
+                  setProductPage(0);
+                }}
+                options={[
+                  { value: '', label: 'All Brands' },
+                  ...brands.map((b) => ({ value: b, label: b })),
+                ]}
+              />
+
+              <Select
+                label=""
+                value={productStockFilter}
+                onChange={(e) => {
+                  setProductStockFilter(e.target.value as any);
+                  setProductPage(0);
+                }}
+                options={[
+                  { value: 'all', label: 'All Stock Levels' },
+                  { value: 'inStock', label: 'In Stock (>0)' },
+                  { value: 'lowStock', label: 'Low Stock (≤10)' },
+                  { value: 'outOfStock', label: 'Out of Stock (0)' },
+                ]}
+              />
+
+              <Select
+                label=""
+                value={productStatusFilter}
+                onChange={(e) => {
+                  setProductStatusFilter(e.target.value as any);
+                  setProductPage(0);
+                }}
+                options={[
+                  { value: 'all', label: 'All Statuses' },
+                  { value: 'active', label: 'Active Only' },
+                  { value: 'inactive', label: 'Archived Only' },
+                ]}
+              />
+
+              <Select
+                label=""
+                value={`${productSortBy}_${productSortDir}`}
+                onChange={(e) => {
+                  const [field, dir] = e.target.value.split('_');
+                  setProductSortBy(field);
+                  setProductSortDir(dir as 'asc' | 'desc');
+                  setProductPage(0);
+                }}
+                options={[
+                  { value: 'id_desc', label: 'Sort: Newest Added' },
+                  { value: 'price_asc', label: 'Sort: Price Low-High' },
+                  { value: 'price_desc', label: 'Sort: Price High-Low' },
+                  { value: 'stockQuantity_asc', label: 'Sort: Stock Low-High' },
+                  { value: 'name_asc', label: 'Sort: Name A-Z' },
+                ]}
+              />
+
+              <Button
+                variant="dark"
+                size="sm"
+                onClick={handleResetProductFilters}
+                leftIcon={<RotateCcw size={12} />}
+                className="w-full"
+              >
+                Reset Filters
+              </Button>
             </div>
-            <Button
-              variant="gold"
-              size="sm"
-              onClick={() => {
-                setProductToEdit(null);
-                setIsProductModalOpen(true);
-              }}
-              leftIcon={<Plus size={14} />}
-            >
-              Add New Artifact
-            </Button>
           </div>
 
           {isLoadingProducts ? (
@@ -435,11 +609,12 @@ export const AdminDashboardPage: React.FC = () => {
               <table className="w-full text-left text-xs">
                 <thead className="bg-luxury-elevated/60 text-luxury-gold uppercase tracking-wider border-b border-luxury-border">
                   <tr>
+                    <th className="p-4 w-16">Preview</th>
                     <th className="p-4">Artifact</th>
                     <th className="p-4">SKU</th>
                     <th className="p-4">Department</th>
-                    <th className="p-4">Price</th>
-                    <th className="p-4">Stock</th>
+                    <th className="p-4">Price / MRP</th>
+                    <th className="p-4">Inventory</th>
                     <th className="p-4">Status</th>
                     <th className="p-4 text-right">Actions</th>
                   </tr>
@@ -447,28 +622,105 @@ export const AdminDashboardPage: React.FC = () => {
                 <tbody className="divide-y divide-luxury-border">
                   {productsData.content.map((p) => (
                     <tr key={p.id} className="hover:bg-luxury-elevated/30 transition-colors">
+                      {/* Image Thumbnail */}
+                      <td className="p-4">
+                        {p.imageUrls && p.imageUrls.length > 0 ? (
+                          <img
+                            src={p.imageUrls[0]}
+                            alt={p.name}
+                            className="w-11 h-11 rounded-sm object-cover border border-luxury-border bg-luxury-elevated"
+                            onError={(e) => {
+                              (e.currentTarget as HTMLImageElement).style.display = 'none';
+                            }}
+                          />
+                        ) : (
+                          <div className="w-11 h-11 rounded-sm border border-luxury-border bg-luxury-elevated flex items-center justify-center text-luxury-muted">
+                            <Package size={16} />
+                          </div>
+                        )}
+                      </td>
+
+                      {/* Name & Brand */}
                       <td className="p-4 font-serif font-bold text-luxury-white">
                         <Link to={`/products/${p.id}`} className="hover:text-luxury-gold flex items-center gap-1.5 group">
                           {p.name}
                           <ExternalLink size={12} className="opacity-0 group-hover:opacity-100" />
                         </Link>
-                        <span className="text-[10px] text-luxury-muted font-sans block">{p.brand}</span>
+                        <span className="text-[10px] text-luxury-muted font-sans block">{p.brand || 'Unbranded'}</span>
                       </td>
+
+                      {/* SKU */}
                       <td className="p-4 font-mono text-luxury-muted">{p.sku}</td>
+
+                      {/* Department */}
                       <td className="p-4 text-luxury-muted">{p.categoryName || 'General'}</td>
-                      <td className="p-4 font-bold text-luxury-white">${p.price.toFixed(2)}</td>
+
+                      {/* Selling Price & MRP */}
                       <td className="p-4">
-                        <span className={`font-bold ${p.stockQuantity <= 5 ? 'text-amber-400' : 'text-luxury-white'}`}>
-                          {p.stockQuantity}
+                        <div className="font-bold text-luxury-white">
+                          ${p.price.toFixed(2)}
+                        </div>
+                        {p.originalPrice && p.originalPrice > p.price ? (
+                          <div className="flex items-center gap-1.5 text-[10px]">
+                            <span className="line-through text-luxury-subtle">
+                              ${p.originalPrice.toFixed(2)}
+                            </span>
+                            {p.discountPercentage ? (
+                              <span className="text-emerald-400 font-bold">
+                                {p.discountPercentage}% off
+                              </span>
+                            ) : null}
+                          </div>
+                        ) : null}
+                      </td>
+
+                      {/* Inventory Stock */}
+                      <td className="p-4">
+                        <span
+                          className={`font-bold inline-flex items-center gap-1 px-2 py-0.5 rounded-sm text-[11px] ${
+                            p.stockQuantity === 0
+                              ? 'bg-rose-950/60 text-rose-400 border border-rose-500/30'
+                              : p.stockQuantity <= 10
+                              ? 'bg-amber-950/60 text-amber-400 border border-amber-500/30'
+                              : 'bg-emerald-950/40 text-emerald-400 border border-emerald-500/20'
+                          }`}
+                        >
+                          {p.stockQuantity === 0 ? 'Out of stock' : `${p.stockQuantity} in stock`}
                         </span>
                       </td>
+
+                      {/* Clickable Active Status Toggle */}
                       <td className="p-4">
-                        {p.active ? (
-                          <Badge variant="dark" size="sm" className="border-emerald-500/40 text-emerald-400">Active</Badge>
-                        ) : (
-                          <Badge variant="danger" size="sm">Archived</Badge>
-                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleToggleProductStatus(p.id, p.active, p.name)}
+                          disabled={togglingProductId === p.id}
+                          title={p.active ? 'Click to archive' : 'Click to publish'}
+                          className="inline-flex items-center gap-1.5 cursor-pointer group transition-all"
+                        >
+                          {p.active ? (
+                            <Badge
+                              variant="dark"
+                              size="sm"
+                              className="border-emerald-500/40 text-emerald-400 group-hover:border-amber-500/60 group-hover:text-amber-300"
+                            >
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 group-hover:bg-amber-300 inline-block animate-pulse" />
+                              Active
+                            </Badge>
+                          ) : (
+                            <Badge
+                              variant="danger"
+                              size="sm"
+                              className="group-hover:border-emerald-500/60 group-hover:text-emerald-300"
+                            >
+                              <span className="w-1.5 h-1.5 rounded-full bg-rose-400 group-hover:bg-emerald-300 inline-block" />
+                              Archived
+                            </Badge>
+                          )}
+                        </button>
                       </td>
+
+                      {/* Actions */}
                       <td className="p-4 text-right">
                         <div className="flex items-center justify-end gap-2">
                           <button
@@ -476,14 +728,14 @@ export const AdminDashboardPage: React.FC = () => {
                               setProductToEdit(p);
                               setIsProductModalOpen(true);
                             }}
-                            className="p-1.5 text-luxury-muted hover:text-luxury-gold"
+                            className="p-1.5 text-luxury-muted hover:text-luxury-gold transition-colors"
                             title="Edit Artifact"
                           >
                             <Edit2 size={14} />
                           </button>
                           <button
                             onClick={() => handleDeleteProduct(p.id, p.name)}
-                            className="p-1.5 text-luxury-muted hover:text-rose-400"
+                            className="p-1.5 text-luxury-muted hover:text-rose-400 transition-colors"
                             title="Archive Artifact"
                           >
                             <Trash2 size={14} />
@@ -498,7 +750,7 @@ export const AdminDashboardPage: React.FC = () => {
               {/* Pagination */}
               {productsData.totalPages > 1 && (
                 <div className="p-4 border-t border-luxury-border flex justify-between items-center text-xs text-luxury-muted">
-                  <span>Page {productPage + 1} of {productsData.totalPages}</span>
+                  <span>Page {productPage + 1} of {productsData.totalPages} ({productsData.totalElements} artifacts total)</span>
                   <div className="flex gap-2">
                     <Button
                       variant="dark"
@@ -521,8 +773,11 @@ export const AdminDashboardPage: React.FC = () => {
               )}
             </div>
           ) : (
-            <div className="text-center py-16 bg-luxury-surface border border-luxury-border rounded-sm text-xs text-luxury-muted">
-              No artifacts match your search query.
+            <div className="text-center py-16 bg-luxury-surface border border-luxury-border rounded-sm text-xs text-luxury-muted space-y-2">
+              <p>No artifacts match your filter criteria.</p>
+              <Button variant="ghost" size="sm" onClick={handleResetProductFilters}>
+                Clear All Filters
+              </Button>
             </div>
           )}
         </div>
