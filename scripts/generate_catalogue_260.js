@@ -414,3 +414,5 @@ catalogue.forEach(p => {
 const csvPath = path.join(dataDir, 'catalogue_260_products.csv');
 fs.writeFileSync(csvPath, csvLines.join('\n'), 'utf8');
 console.log(`Wrote CSV catalogue file: ${csvPath} (${(fs.statSync(csvPath).size / 1024).toFixed(1)} KB)`);
+
+module.exports = { catalogue };
