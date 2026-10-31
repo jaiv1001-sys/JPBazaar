@@ -12,5 +12,9 @@ public interface BulkImportService {
 
     BulkImportPreviewResponse previewImport(MultipartFile file);
 
+    BulkImportPreviewResponse previewImport(java.io.InputStream inputStream, String filename);
+
     BulkImportResultResponse executeImport(MultipartFile file);
+
+    BulkImportResultResponse executeImport(java.io.InputStream inputStream, String filename);
 }

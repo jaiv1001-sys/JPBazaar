@@ -34,6 +34,7 @@ public class DataInitializer implements CommandLineRunner {
     private final ProductRepository productRepository;
     private final ProductImageRepository productImageRepository;
     private final PasswordEncoder passwordEncoder;
+    private final com.jpbazaar.service.BulkImportService bulkImportService;
 
     @Override
     @Transactional
@@ -82,7 +83,7 @@ public class DataInitializer implements CommandLineRunner {
             return c;
         });
 
-        // 2. Seed Categories
+        // 2. Seed Categories (Ensure all 6 catalog departments exist)
         Category electronics = categoryRepository.findByName("Electronics").orElseGet(() ->
                 categoryRepository.save(Category.builder()
                         .name("Electronics")
@@ -90,81 +91,112 @@ public class DataInitializer implements CommandLineRunner {
                         .build())
         );
 
-        Category audio = categoryRepository.findByName("Audio & Wearables").orElseGet(() ->
+        Category fashion = categoryRepository.findByName("Fashion").orElseGet(() ->
                 categoryRepository.save(Category.builder()
-                        .name("Audio & Wearables")
-                        .description("Premium noise-cancelling headphones, wireless earbuds, and smartwatches.")
-                        .build())
-        );
-
-        Category fashion = categoryRepository.findByName("Fashion & Apparel").orElseGet(() ->
-                categoryRepository.save(Category.builder()
-                        .name("Fashion & Apparel")
-                        .description("Designer streetwear, tailored apparel, and premium everyday sneakers.")
+                        .name("Fashion")
+                        .description("Designer apparel, tailored clothing, luxury footwear, and seasonal collections.")
                         .build())
         );
 
         Category home = categoryRepository.findByName("Home & Living").orElseGet(() ->
                 categoryRepository.save(Category.builder()
                         .name("Home & Living")
-                        .description("Artisan coffee machines, smart appliances, and modern ergonomic furnishings.")
+                        .description("Smart home appliances, modern ergonomic furnishings, and culinary essentials.")
+                        .build())
+        );
+
+        Category accessories = categoryRepository.findByName("Accessories").orElseGet(() ->
+                categoryRepository.save(Category.builder()
+                        .name("Accessories")
+                        .description("Premium watches, designer eyewear, audio gear, and lifestyle accessories.")
+                        .build())
+        );
+
+        Category beauty = categoryRepository.findByName("Beauty").orElseGet(() ->
+                categoryRepository.save(Category.builder()
+                        .name("Beauty")
+                        .description("Dermatological skincare, luxury fragrances, cosmetics, and self-care.")
+                        .build())
+        );
+
+        Category sports = categoryRepository.findByName("Sports & Fitness").orElseGet(() ->
+                categoryRepository.save(Category.builder()
+                        .name("Sports & Fitness")
+                        .description("Athletic performance gear, gym equipment, sportswear, and outdoor fitness.")
                         .build())
         );
 
         // 3. Seed Products if empty
         if (productRepository.count() == 0) {
-            seedProduct("Apple MacBook Pro 16\" M3 Max",
-                    "Apple M3 Max chip with 16-core CPU, 40-core GPU, 36GB Unified Memory, and 1TB SSD Storage. Liquid Retina XDR display with ProMotion.",
-                    new BigDecimal("2499.00"), 15, "APPL-MBP16-M3", "Apple", new BigDecimal("4.9"), electronics,
-                    "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?auto=format&fit=crop&w=800&q=80");
-
-            seedProduct("Sony WH-1000XM5 Noise-Cancelling Headphones",
-                    "Industry-leading noise cancellation optimized with two processors and 8 microphones. Up to 30-hour battery life with ultra-comfortable lightweight design.",
-                    new BigDecimal("398.00"), 24, "SONY-WH1000XM5-BLK", "Sony", new BigDecimal("4.8"), audio,
-                    "https://images.unsplash.com/photo-1546435770-a3e426bf472b?auto=format&fit=crop&w=800&q=80");
-
-            seedProduct("iPhone 15 Pro Max - Titanium Blue",
-                    "Forged in titanium with industry-leading A17 Pro chip, custom Action button, and the most versatile 5x optical telephoto camera system.",
-                    new BigDecimal("1199.00"), 30, "APPL-IP15PM-256", "Apple", new BigDecimal("4.9"), electronics,
-                    "https://images.unsplash.com/photo-1695048133142-1a20484d2569?auto=format&fit=crop&w=800&q=80");
-
-            seedProduct("Apple Watch Ultra 2 GPS + Cellular",
-                    "Rugged 49mm titanium case, precision dual-frequency GPS, up to 36 hours of battery life, and the brightest Apple display ever made.",
-                    new BigDecimal("799.00"), 18, "APPL-WAT-ULT2", "Apple", new BigDecimal("4.8"), audio,
-                    "https://images.unsplash.com/photo-1508685096489-7aacd43bd3b1?auto=format&fit=crop&w=800&q=80");
-
-            seedProduct("Samsung Odyssey Neo G9 Curved Gaming Monitor",
-                    "49\" Dual QHD (5120x1440) Mini-LED display with 240Hz refresh rate, 1ms response time, and Quantum HDR2000 for unmatched immersion.",
-                    new BigDecimal("1399.00"), 8, "SMSG-NEO-G9-49", "Samsung", new BigDecimal("4.7"), electronics,
-                    "https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?auto=format&fit=crop&w=800&q=80");
-
-            seedProduct("Nike Air Max 270 React Sneakers",
-                    "Iconic lifestyle sneaker combining Nike's biggest heel Air unit with lightweight, durable Nike React foam for super smooth cushioning.",
-                    new BigDecimal("160.00"), 45, "NIKE-AM270-WHT", "Nike", new BigDecimal("4.6"), fashion,
-                    "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80");
-
-            seedProduct("Levi's Vintage Sherpa Trucker Jacket",
-                    "Classic denim jacket lined with plush sherpa for warmth and comfort. Features signature metal shank buttons and chest flap pockets.",
-                    new BigDecimal("128.00"), 22, "LEVI-SHERPA-TRK", "Levi's", new BigDecimal("4.7"), fashion,
-                    "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80");
-
-            seedProduct("De'Longhi Magnifica S Automatic Espresso Machine",
-                    "Bean-to-cup espresso and cappuccino machine with manual frother, 13 grind settings, and rapid heating thermoblock technology.",
-                    new BigDecimal("649.00"), 12, "DLNG-MAGNIFICA-S", "De'Longhi", new BigDecimal("4.8"), home,
-                    "https://images.unsplash.com/photo-1517668808822-9ebb02f2a0e6?auto=format&fit=crop&w=800&q=80");
-
-            seedProduct("Dyson V15 Detect Cordless Vacuum Cleaner",
-                    "Laser reveals invisible microscopic dust on hard floors. Acoustic piezo sensor counts and measures the size of dust particles.",
-                    new BigDecimal("749.00"), 14, "DYSN-V15-DETECT", "Dyson", new BigDecimal("4.9"), home,
-                    "https://images.unsplash.com/photo-1558317374-067fb5f30001?auto=format&fit=crop&w=800&q=80");
-
-            seedProduct("Logitech MX Master 3S Wireless Mouse",
-                    "Quiet clicks with 8000 DPI track-on-glass sensor and MagSpeed electromagnetic scrolling for supreme precision and tactile control.",
-                    new BigDecimal("99.99"), 50, "LOGI-MXM3S-PLT", "Logitech", new BigDecimal("4.9"), electronics,
-                    "https://images.unsplash.com/photo-1527864550417-7fd91fc51a46?auto=format&fit=crop&w=800&q=80");
+            java.io.InputStream catalogStream = getClass().getResourceAsStream("/data/catalogue_260_products.csv");
+            if (catalogStream != null) {
+                log.info("Importing comprehensive 260-product catalogue from classpath resource...");
+                try {
+                    var result = bulkImportService.executeImport(catalogStream, "catalogue_260_products.csv");
+                    log.info("260-product catalogue seeded: {} imported, {} failed.",
+                            result.successfullyImported(), result.failedRows());
+                } catch (Exception ex) {
+                    log.error("Failed to seed 260 catalogue from CSV, falling back to basic demo seeds: {}", ex.getMessage());
+                    seedDefaultDemoProducts(electronics, fashion, home, accessories);
+                }
+            } else {
+                seedDefaultDemoProducts(electronics, fashion, home, accessories);
+            }
         }
 
         log.info("JPBazaar demo storefront data successfully seeded!");
+    }
+
+    private void seedDefaultDemoProducts(Category electronics, Category fashion, Category home, Category accessories) {
+        seedProduct("Apple MacBook Pro 16\" M3 Max",
+                "Apple M3 Max chip with 16-core CPU, 40-core GPU, 36GB Unified Memory, and 1TB SSD Storage. Liquid Retina XDR display with ProMotion.",
+                new BigDecimal("2499.00"), 15, "APPL-MBP16-M3", "Apple", new BigDecimal("4.9"), electronics,
+                "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?auto=format&fit=crop&w=800&q=80");
+
+        seedProduct("Sony WH-1000XM5 Noise-Cancelling Headphones",
+                "Industry-leading noise cancellation optimized with two processors and 8 microphones. Up to 30-hour battery life with ultra-comfortable lightweight design.",
+                new BigDecimal("398.00"), 24, "SONY-WH1000XM5-BLK", "Sony", new BigDecimal("4.8"), accessories,
+                "https://images.unsplash.com/photo-1546435770-a3e426bf472b?auto=format&fit=crop&w=800&q=80");
+
+        seedProduct("iPhone 15 Pro Max - Titanium Blue",
+                "Forged in titanium with industry-leading A17 Pro chip, custom Action button, and the most versatile 5x optical telephoto camera system.",
+                new BigDecimal("1199.00"), 30, "APPL-IP15PM-256", "Apple", new BigDecimal("4.9"), electronics,
+                "https://images.unsplash.com/photo-1695048133142-1a20484d2569?auto=format&fit=crop&w=800&q=80");
+
+        seedProduct("Apple Watch Ultra 2 GPS + Cellular",
+                "Rugged 49mm titanium case, precision dual-frequency GPS, up to 36 hours of battery life, and the brightest Apple display ever made.",
+                new BigDecimal("799.00"), 18, "APPL-WAT-ULT2", "Apple", new BigDecimal("4.8"), accessories,
+                "https://images.unsplash.com/photo-1508685096489-7aacd43bd3b1?auto=format&fit=crop&w=800&q=80");
+
+        seedProduct("Samsung Odyssey Neo G9 Curved Gaming Monitor",
+                "49\" Dual QHD (5120x1440) Mini-LED display with 240Hz refresh rate, 1ms response time, and Quantum HDR2000 for unmatched immersion.",
+                new BigDecimal("1399.00"), 8, "SMSG-NEO-G9-49", "Samsung", new BigDecimal("4.7"), electronics,
+                "https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?auto=format&fit=crop&w=800&q=80");
+
+        seedProduct("Nike Air Max 270 React Sneakers",
+                "Iconic lifestyle sneaker combining Nike's biggest heel Air unit with lightweight, durable Nike React foam for super smooth cushioning.",
+                new BigDecimal("160.00"), 45, "NIKE-AM270-WHT", "Nike", new BigDecimal("4.6"), fashion,
+                "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80");
+
+        seedProduct("Levi's Vintage Sherpa Trucker Jacket",
+                "Classic denim jacket lined with plush sherpa for warmth and comfort. Features signature metal shank buttons and chest flap pockets.",
+                new BigDecimal("128.00"), 22, "LEVI-SHERPA-TRK", "Levi's", new BigDecimal("4.7"), fashion,
+                "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80");
+
+        seedProduct("De'Longhi Magnifica S Automatic Espresso Machine",
+                "Bean-to-cup espresso and cappuccino machine with manual frother, 13 grind settings, and rapid heating thermoblock technology.",
+                new BigDecimal("649.00"), 12, "DLNG-MAGNIFICA-S", "De'Longhi", new BigDecimal("4.8"), home,
+                "https://images.unsplash.com/photo-1517668808822-9ebb02f2a0e6?auto=format&fit=crop&w=800&q=80");
+
+        seedProduct("Dyson V15 Detect Cordless Vacuum Cleaner",
+                "Laser reveals invisible microscopic dust on hard floors. Acoustic piezo sensor counts and measures the size of dust particles.",
+                new BigDecimal("749.00"), 14, "DYSN-V15-DETECT", "Dyson", new BigDecimal("4.9"), home,
+                "https://images.unsplash.com/photo-1558317374-067fb5f30001?auto=format&fit=crop&w=800&q=80");
+
+        seedProduct("Logitech MX Master 3S Wireless Mouse",
+                "Quiet clicks with 8000 DPI track-on-glass sensor and MagSpeed electromagnetic scrolling for supreme precision and tactile control.",
+                new BigDecimal("99.99"), 50, "LOGI-MXM3S-PLT", "Logitech", new BigDecimal("4.9"), electronics,
+                "https://images.unsplash.com/photo-1527864550417-7fd91fc51a46?auto=format&fit=crop&w=800&q=80");
     }
 
     private void seedProduct(String name, String desc, BigDecimal price, int stock, String sku, String brand,

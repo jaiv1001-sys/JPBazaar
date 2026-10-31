@@ -25,13 +25,16 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     @Query("SELECT p FROM Product p LEFT JOIN FETCH p.category WHERE p.id = :id")
     Optional<Product> findById(@Param("id") Long id);
 
-    Optional<Product> findBySku(String sku);
+    @Query("SELECT p FROM Product p LEFT JOIN FETCH p.category WHERE p.sku = :sku")
+    Optional<Product> findBySku(@Param("sku") String sku);
 
     boolean existsBySku(String sku);
 
     boolean existsBySkuAndIdNot(String sku, Long id);
 
     boolean existsByCategoryId(Long categoryId);
+
+    long countByCategoryId(Long categoryId);
 
     @Query(value = "SELECT p FROM Product p LEFT JOIN FETCH p.category WHERE p.category.id = :categoryId AND p.active = true",
            countQuery = "SELECT COUNT(p) FROM Product p WHERE p.category.id = :categoryId AND p.active = true")

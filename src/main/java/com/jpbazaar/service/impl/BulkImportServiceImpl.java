@@ -158,7 +158,19 @@ public class BulkImportServiceImpl implements BulkImportService {
     @Transactional(readOnly = true)
     public BulkImportPreviewResponse previewImport(MultipartFile file) {
         validateFileMetadata(file);
-        List<ProductImportRowDto> parsedRows = parseAndValidateFile(file);
+        try {
+            return previewImport(file.getInputStream(), file.getOriginalFilename());
+        } catch (IOException e) {
+            log.error("Failed to read uploaded file", e);
+            throw new InvalidRequestException("Could not read uploaded file: " + e.getMessage());
+        }
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public BulkImportPreviewResponse previewImport(InputStream inputStream, String filename) {
+        validateFilename(filename);
+        List<ProductImportRowDto> parsedRows = parseAndValidateFile(inputStream, filename);
 
         int totalRows = parsedRows.size();
         int validRows = (int) parsedRows.stream().filter(ProductImportRowDto::valid).count();
@@ -185,7 +197,23 @@ public class BulkImportServiceImpl implements BulkImportService {
     })
     public BulkImportResultResponse executeImport(MultipartFile file) {
         validateFileMetadata(file);
-        List<ProductImportRowDto> parsedRows = parseAndValidateFile(file);
+        try {
+            return executeImport(file.getInputStream(), file.getOriginalFilename());
+        } catch (IOException e) {
+            log.error("Failed to read uploaded file", e);
+            throw new InvalidRequestException("Could not read uploaded file: " + e.getMessage());
+        }
+    }
+
+    @Override
+    @Transactional
+    @Caching(evict = {
+            @CacheEvict(value = "products", allEntries = true),
+            @CacheEvict(value = "brands", allEntries = true)
+    })
+    public BulkImportResultResponse executeImport(InputStream inputStream, String filename) {
+        validateFilename(filename);
+        List<ProductImportRowDto> parsedRows = parseAndValidateFile(inputStream, filename);
 
         Map<String, Category> categoryMap = loadCategoryMap();
         List<Long> importedIds = new ArrayList<>();
@@ -278,24 +306,30 @@ public class BulkImportServiceImpl implements BulkImportService {
         if (file == null || file.isEmpty()) {
             throw new InvalidRequestException("Uploaded file is empty. Please select a valid CSV or XLSX file.");
         }
-        String originalFilename = file.getOriginalFilename();
-        if (originalFilename == null) {
+        validateFilename(file.getOriginalFilename());
+    }
+
+    private void validateFilename(String filename) {
+        if (filename == null || filename.isBlank()) {
             throw new InvalidRequestException("File name cannot be empty.");
         }
-        String lower = originalFilename.toLowerCase();
+        String lower = filename.toLowerCase();
         if (!lower.endsWith(".csv") && !lower.endsWith(".xlsx") && !lower.endsWith(".xls")) {
-            throw new InvalidRequestException("Invalid file format (" + originalFilename + "). Only .csv and .xlsx files are supported.");
+            throw new InvalidRequestException("Invalid file format (" + filename + "). Only .csv and .xlsx files are supported.");
         }
     }
 
-    private List<ProductImportRowDto> parseAndValidateFile(MultipartFile file) {
-        String filename = Objects.requireNonNull(file.getOriginalFilename()).toLowerCase();
+    private List<ProductImportRowDto> parseAndValidateFile(InputStream inputStream, String filename) {
+        if (inputStream == null) {
+            throw new InvalidRequestException("Input stream cannot be null.");
+        }
+        String lower = Objects.requireNonNull(filename).toLowerCase();
         List<RawRow> rawRows;
         try {
-            if (filename.endsWith(".csv")) {
-                rawRows = parseCsv(file.getInputStream());
+            if (lower.endsWith(".csv")) {
+                rawRows = parseCsv(inputStream);
             } else {
-                rawRows = parseExcel(file.getInputStream());
+                rawRows = parseExcel(inputStream);
             }
         } catch (IOException e) {
             log.error("Failed to parse uploaded file", e);
