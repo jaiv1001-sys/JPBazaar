@@ -189,6 +189,79 @@ class BulkImportControllerTest {
     }
 
     @Test
+    void executeImport_PartialFailure_HandlesValidAndReportsInvalid() throws Exception {
+        long ts = System.currentTimeMillis();
+        String validSku = "VALID-PARTIAL-" + ts;
+        String invalidSku = "INVALID-PARTIAL-" + ts;
+
+        String csvContent = "Name,Category,Brand,SKU,Price,OriginalPrice,Stock,Description,Specifications,ImageUrl\n" +
+                "Valid Item,BulkDept,BrandA," + validSku + ",199.99,249.99,10,Valid Desc,,\n" +
+                "Invalid Item,NonExistentCategory,BrandB," + invalidSku + ",99.99,119.99,5,Bad Category,,\n";
+
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "partial_test.csv", "text/csv", csvContent.getBytes(StandardCharsets.UTF_8)
+        );
+
+        mockMvc.perform(multipart("/api/admin/products/import/confirm")
+                        .file(file)
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.totalProcessed").value(2))
+                .andExpect(jsonPath("$.data.successfullyImported").value(1))
+                .andExpect(jsonPath("$.data.failedRows").value(1))
+                .andExpect(jsonPath("$.data.failureDetails[0].name").value("Invalid Item"))
+                .andExpect(jsonPath("$.data.failureDetails[0].errors[0]").value(org.hamcrest.Matchers.containsString("Category 'NonExistentCategory' does not exist")));
+
+        org.junit.jupiter.api.Assertions.assertTrue(productRepository.existsBySku(validSku));
+        org.junit.jupiter.api.Assertions.assertFalse(productRepository.existsBySku(invalidSku));
+    }
+
+    @Test
+    void executeImport_RepeatedFile_PreventsDuplicateImports() throws Exception {
+        long ts = System.currentTimeMillis();
+        String sku = "REPEAT-" + ts;
+
+        String csvContent = "Name,Category,Brand,SKU,Price,OriginalPrice,Stock,Description,Specifications,ImageUrl\n" +
+                "Repeat Item,BulkDept,BrandA," + sku + ",89.99,99.99,15,Desc,,\n";
+
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "repeat_test.csv", "text/csv", csvContent.getBytes(StandardCharsets.UTF_8)
+        );
+
+        // First import should succeed
+        mockMvc.perform(multipart("/api/admin/products/import/confirm")
+                        .file(file)
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.successfullyImported").value(1))
+                .andExpect(jsonPath("$.data.failedRows").value(0));
+
+        // Second import of the same file should reject as duplicate SKU in database
+        mockMvc.perform(multipart("/api/admin/products/import/confirm")
+                        .file(file)
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.successfullyImported").value(0))
+                .andExpect(jsonPath("$.data.failedRows").value(1))
+                .andExpect(jsonPath("$.data.failureDetails[0].errors[0]").value(org.hamcrest.Matchers.containsString("SKU already exists in database")));
+    }
+
+    @Test
+    void previewImport_UnsupportedExtension_Returns400BadRequest() throws Exception {
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "products.txt", "text/plain", "Some text content".getBytes(StandardCharsets.UTF_8)
+        );
+
+        mockMvc.perform(multipart("/api/admin/products/import/preview")
+                        .file(file)
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("Invalid file format")));
+    }
+
+    @Test
     void previewImport_AsCustomer_Forbidden() throws Exception {
         MockMultipartFile file = new MockMultipartFile(
                 "file", "test.csv", "text/csv", "Name,Category,Brand,SKU,Price,OriginalPrice,Stock,Description,Specifications,ImageUrl\n".getBytes(StandardCharsets.UTF_8)
