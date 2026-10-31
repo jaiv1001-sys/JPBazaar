@@ -20,9 +20,16 @@ public record ProductUpdateRequest(
         @Size(max = 2000, message = "Product description must not exceed 2000 characters")
         String description,
 
-        @Schema(description = "Updated unit price", example = "229.99")
+        @Schema(description = "Updated unit selling price", example = "229.99")
         @DecimalMin(value = "0.0", inclusive = true, message = "Price must be non-negative")
         BigDecimal price,
+
+        @Schema(description = "Updated original price / MRP", example = "279.99")
+        @DecimalMin(value = "0.0", inclusive = true, message = "Original price must be non-negative")
+        BigDecimal originalPrice,
+
+        @Schema(description = "Updated technical specifications or attributes", example = "{\"Battery\": \"40h\", \"NoiseCancelling\": true}")
+        String specifications,
 
         @Schema(description = "Updated warehouse stock quantity", example = "75")
         @Min(value = 0, message = "Stock quantity must be non-negative")
@@ -34,4 +41,8 @@ public record ProductUpdateRequest(
 
         @Schema(description = "Active status flag", example = "true")
         Boolean active
-) {}
+) {
+    public ProductUpdateRequest(Long categoryId, String name, String description, BigDecimal price, Integer stockQuantity, String brand, Boolean active) {
+        this(categoryId, name, description, price, null, null, stockQuantity, brand, active);
+    }
+}

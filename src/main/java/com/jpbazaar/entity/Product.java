@@ -48,6 +48,12 @@ public class Product {
     @Column(name = "price", nullable = false, precision = 10, scale = 2)
     private BigDecimal price;
 
+    @Column(name = "original_price", precision = 10, scale = 2)
+    private BigDecimal originalPrice;
+
+    @Column(name = "specifications", columnDefinition = "TEXT")
+    private String specifications;
+
     @Column(name = "stock_quantity", nullable = false)
     @Builder.Default
     private Integer stockQuantity = 0;

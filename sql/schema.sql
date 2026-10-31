@@ -68,6 +68,8 @@ CREATE TABLE products (
     name VARCHAR(255) NOT NULL,
     description TEXT,
     price NUMERIC(10, 2) NOT NULL CONSTRAINT chk_products_price CHECK (price >= 0),
+    original_price NUMERIC(10, 2) CONSTRAINT chk_products_original_price CHECK (original_price IS NULL OR original_price >= 0),
+    specifications TEXT,
     stock_quantity INT NOT NULL DEFAULT 0 CONSTRAINT chk_products_stock CHECK (stock_quantity >= 0),
     sku VARCHAR(100) NOT NULL CONSTRAINT uk_products_sku UNIQUE,
     brand VARCHAR(100),

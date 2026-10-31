@@ -104,6 +104,9 @@ export interface Product {
   name: string;
   description?: string;
   price: number;
+  originalPrice?: number;
+  discountPercentage?: number;
+  specifications?: string;
   stockQuantity: number;
   sku: string;
   brand?: string;
@@ -122,6 +125,8 @@ export interface ProductCreateRequest {
   name: string;
   description?: string;
   price: number;
+  originalPrice?: number;
+  specifications?: string;
   stockQuantity: number;
   sku: string;
   brand?: string;
@@ -133,6 +138,8 @@ export interface ProductUpdateRequest {
   name?: string;
   description?: string;
   price?: number;
+  originalPrice?: number;
+  specifications?: string;
   stockQuantity?: number;
   sku?: string;
   brand?: string;

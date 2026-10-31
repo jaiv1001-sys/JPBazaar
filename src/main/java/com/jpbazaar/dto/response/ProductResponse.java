@@ -23,8 +23,17 @@ public record ProductResponse(
         @Schema(description = "Product description", example = "High fidelity audio with 30-hour battery life")
         String description,
 
-        @Schema(description = "Unit price in standard currency", example = "199.99")
+        @Schema(description = "Unit selling price in standard currency", example = "199.99")
         BigDecimal price,
+
+        @Schema(description = "Original retail price / MRP", example = "249.99")
+        BigDecimal originalPrice,
+
+        @Schema(description = "Discount percentage when originalPrice > price", example = "20")
+        Integer discountPercentage,
+
+        @Schema(description = "Technical specifications or attributes (JSON/text)", example = "{\"Battery\": \"30h\"}")
+        String specifications,
 
         @Schema(description = "Available warehouse stock quantity", example = "50")
         Integer stockQuantity,
@@ -49,4 +58,25 @@ public record ProductResponse(
 
         @Schema(description = "Product last updated timestamp")
         OffsetDateTime updatedAt
-) implements Serializable {}
+) implements Serializable {
+
+    public ProductResponse(
+            Long id,
+            Long categoryId,
+            String categoryName,
+            String name,
+            String description,
+            BigDecimal price,
+            Integer stockQuantity,
+            String sku,
+            String brand,
+            BigDecimal rating,
+            Boolean active,
+            List<String> imageUrls,
+            OffsetDateTime createdAt,
+            OffsetDateTime updatedAt
+    ) {
+        this(id, categoryId, categoryName, name, description, price, null, null, null,
+             stockQuantity, sku, brand, rating, active, imageUrls, createdAt, updatedAt);
+    }
+}

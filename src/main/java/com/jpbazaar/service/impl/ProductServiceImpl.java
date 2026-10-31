@@ -22,6 +22,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.List;
 
 @Service
@@ -56,6 +57,8 @@ public class ProductServiceImpl implements ProductService {
                 .name(request.name())
                 .description(request.description())
                 .price(request.price())
+                .originalPrice(request.originalPrice())
+                .specifications(request.specifications())
                 .stockQuantity(request.stockQuantity())
                 .sku(request.sku())
                 .brand(request.brand())
@@ -119,6 +122,12 @@ public class ProductServiceImpl implements ProductService {
         if (request.price() != null) {
             product.setPrice(request.price());
         }
+        if (request.originalPrice() != null) {
+            product.setOriginalPrice(request.originalPrice());
+        }
+        if (request.specifications() != null) {
+            product.setSpecifications(request.specifications());
+        }
         if (request.stockQuantity() != null) {
             product.setStockQuantity(request.stockQuantity());
         }
@@ -156,6 +165,17 @@ public class ProductServiceImpl implements ProductService {
                 ? product.getImages().stream().map(ProductImage::getImageUrl).toList()
                 : List.of();
 
+        Integer discountPercentage = null;
+        if (product.getOriginalPrice() != null
+                && product.getPrice() != null
+                && product.getOriginalPrice().compareTo(product.getPrice()) > 0
+                && product.getOriginalPrice().compareTo(BigDecimal.ZERO) > 0) {
+            BigDecimal diff = product.getOriginalPrice().subtract(product.getPrice());
+            discountPercentage = diff.multiply(BigDecimal.valueOf(100))
+                    .divide(product.getOriginalPrice(), 0, RoundingMode.HALF_UP)
+                    .intValue();
+        }
+
         return new ProductResponse(
                 product.getId(),
                 product.getCategory().getId(),
@@ -163,6 +183,9 @@ public class ProductServiceImpl implements ProductService {
                 product.getName(),
                 product.getDescription(),
                 product.getPrice(),
+                product.getOriginalPrice(),
+                discountPercentage,
+                product.getSpecifications(),
                 product.getStockQuantity(),
                 product.getSku(),
                 product.getBrand(),

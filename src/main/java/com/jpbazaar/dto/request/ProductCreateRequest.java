@@ -24,10 +24,17 @@ public record ProductCreateRequest(
         @Size(max = 2000, message = "Product description must not exceed 2000 characters")
         String description,
 
-        @Schema(description = "Unit price in standard currency", example = "199.99")
+        @Schema(description = "Unit selling price in standard currency", example = "199.99")
         @NotNull(message = "Price is required")
         @DecimalMin(value = "0.0", inclusive = true, message = "Price must be non-negative")
         BigDecimal price,
+
+        @Schema(description = "Original retail price / MRP for discount calculations", example = "249.99")
+        @DecimalMin(value = "0.0", inclusive = true, message = "Original price must be non-negative")
+        BigDecimal originalPrice,
+
+        @Schema(description = "Technical specifications or attributes (JSON or formatted text)", example = "{\"Battery\": \"30h\", \"Connectivity\": \"Bluetooth 5.2\"}")
+        String specifications,
 
         @Schema(description = "Available warehouse stock quantity", example = "50")
         @NotNull(message = "Stock quantity is required")
@@ -45,4 +52,8 @@ public record ProductCreateRequest(
 
         @Schema(description = "Flag indicating if product is visible and active for purchase", example = "true")
         Boolean active
-) {}
+) {
+    public ProductCreateRequest(Long categoryId, String name, String description, BigDecimal price, Integer stockQuantity, String sku, String brand, Boolean active) {
+        this(categoryId, name, description, price, null, null, stockQuantity, sku, brand, active);
+    }
+}
