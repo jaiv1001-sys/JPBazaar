@@ -16,6 +16,18 @@ services:
         fromDatabase:
           name: jpbazaar-db
           property: connectionString
+      - key: DB_HOST
+        fromDatabase:
+          name: jpbazaar-db
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: jpbazaar-db
+          property: port
+      - key: DB_NAME
+        fromDatabase:
+          name: jpbazaar-db
+          property: database
       - key: DB_USERNAME
         fromDatabase:
           name: jpbazaar-db
@@ -25,7 +37,7 @@ services:
           name: jpbazaar-db
           property: password
       - key: JPA_DDL_AUTO
-        value: validate
+        value: update
       - key: JWT_SECRET
         generateValue: true
       - key: JWT_EXPIRATION_MS

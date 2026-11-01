@@ -21,7 +21,6 @@ spring:
 
   jpa:
     open-in-view: false
-    database-platform: org.hibernate.dialect.PostgreSQLDialect
     hibernate:
       ddl-auto: ${JPA_DDL_AUTO:validate}
     show-sql: false
@@ -47,6 +46,8 @@ spring:
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:}
       timeout: 2000ms
+      repositories:
+        enabled: false
 
   mail:
     host: ${SPRING_MAIL_HOST:smtp.gmail.com}
