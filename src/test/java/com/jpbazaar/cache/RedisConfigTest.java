@@ -3,6 +3,7 @@ package com.jpbazaar.cache;
 import com.jpbazaar.config.RedisConfig;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.cache.CacheManager;
 import org.springframework.data.redis.cache.RedisCacheManager;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -42,5 +43,16 @@ class RedisConfigTest {
 
         RedisCacheManager cacheManager = redisConfig.cacheManager(connectionFactory);
         assertThat(cacheManager).isNotNull();
+    }
+
+    @Test
+    @DisplayName("Should configure fallback in-memory CacheManager")
+    void shouldConfigureInMemoryCacheManagerFallback() {
+        RedisConfig redisConfig = new RedisConfig();
+        CacheManager cacheManager = redisConfig.inMemoryCacheManager();
+        assertThat(cacheManager).isNotNull();
+        assertThat(cacheManager.getCacheNames()).containsExactlyInAnyOrder(
+                RedisConfig.CACHE_PRODUCTS, RedisConfig.CACHE_CATEGORY, RedisConfig.CACHE_CATEGORIES
+        );
     }
 }
