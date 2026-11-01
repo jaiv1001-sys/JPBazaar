@@ -3,6 +3,12 @@ spring:
     activate:
       on-profile: prod
 
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.redis.RedisReactiveAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration
+
   datasource:
     url: ${DB_URL:}
     username: ${DB_USERNAME:}
@@ -34,21 +40,9 @@ spring:
 
   cache:
     type: ${CACHE_TYPE:simple}
-    redis:
-      time-to-live: 600000
-      cache-null-values: false
-
-  data:
-    redis:
-      host: ${REDIS_HOST:localhost}
-      port: ${REDIS_PORT:6379}
-      password: ${REDIS_PASSWORD:}
-      timeout: 2000ms
-      repositories:
-        enabled: false
 
   mail:
-    host: ${SPRING_MAIL_HOST:}
+    host: ${SPRING_MAIL_HOST:smtp.gmail.com}
     port: ${SPRING_MAIL_PORT:587}
     username: ${SPRING_MAIL_USERNAME:}
     password: ${SPRING_MAIL_PASSWORD:}
@@ -87,6 +81,10 @@ management:
       enabled: true
     readinessstate:
       enabled: true
+    mail:
+      enabled: false
+    redis:
+      enabled: false
 
 jwt:
   secret: ${JWT_SECRET}

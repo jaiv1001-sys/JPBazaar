@@ -90,6 +90,10 @@ management:
       enabled: true
     readinessstate:
       enabled: true
+    mail:
+      enabled: false
+    redis:
+      enabled: false
   info:
     env:
       enabled: true
