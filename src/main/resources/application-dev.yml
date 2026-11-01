@@ -17,6 +17,7 @@ spring:
       port: ${REDIS_PORT:6379}
 
   jpa:
+    open-in-view: false
     show-sql: true
     hibernate:
       ddl-auto: update
@@ -24,6 +25,19 @@ spring:
 jwt:
   secret: ${JWT_SECRET:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
   expiration-ms: ${JWT_EXPIRATION_MS:86400000}
+
+razorpay:
+  key-id: ${RAZORPAY_KEY_ID:rzp_test_JPBazaarDemoKey123}
+  key-secret: ${RAZORPAY_KEY_SECRET:JPBazaarDemoSecretKey456}
+  webhook-secret: ${RAZORPAY_WEBHOOK_SECRET:JPBazaarWebhookSecret789}
+  currency: ${RAZORPAY_CURRENCY:INR}
+  enabled: ${RAZORPAY_ENABLED:true}
+
+app:
+  mail:
+    enabled: ${APP_MAIL_ENABLED:true}
+    from: ${APP_MAIL_FROM:concierge@jpbazaar.com}
+    from-name: ${APP_MAIL_FROM_NAME:JPBazaar Luxury Concierge}
 
 logging:
   level:

@@ -22,7 +22,10 @@ import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+
 @Service
+@ConditionalOnProperty(name = "cloudinary.enabled", havingValue = "false", matchIfMissing = true)
 public class LocalStorageServiceImpl implements ImageStorageService {
 
     private static final Logger log = LoggerFactory.getLogger(LocalStorageServiceImpl.class);

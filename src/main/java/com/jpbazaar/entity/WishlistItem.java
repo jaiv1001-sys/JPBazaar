@@ -8,7 +8,8 @@ import java.time.OffsetDateTime;
 
 @Entity
 @Table(name = "wishlist_items", indexes = {
-        @Index(name = "idx_wishlist_items_wishlist_id", columnList = "wishlist_id")
+        @Index(name = "idx_wishlist_items_wishlist_id", columnList = "wishlist_id"),
+        @Index(name = "idx_wishlist_items_product_id", columnList = "product_id")
 }, uniqueConstraints = {
         @UniqueConstraint(name = "uk_wishlist_product", columnNames = {"wishlist_id", "product_id"})
 })

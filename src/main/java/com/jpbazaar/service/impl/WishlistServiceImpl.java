@@ -106,10 +106,11 @@ public class WishlistServiceImpl implements WishlistService {
     }
 
     private Wishlist getOrCreateWishlist(String userEmail) {
-        return wishlistRepository.findByUserEmailWithItems(userEmail)
+        String cleanEmail = userEmail != null ? userEmail.trim() : "";
+        return wishlistRepository.findByUserEmailWithItems(cleanEmail)
                 .orElseGet(() -> {
-                    User user = userRepository.findByEmail(userEmail)
-                            .orElseThrow(() -> new ResourceNotFoundException("User not found with email: " + userEmail));
+                    User user = userRepository.findByEmailIgnoreCase(cleanEmail)
+                            .orElseThrow(() -> new ResourceNotFoundException("User not found with email: " + cleanEmail));
 
                     Wishlist newWishlist = Wishlist.builder()
                             .user(user)

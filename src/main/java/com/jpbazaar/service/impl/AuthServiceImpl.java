@@ -31,6 +31,7 @@ public class AuthServiceImpl implements AuthService {
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
     private final JwtTokenProvider tokenProvider;
+    private final org.springframework.context.ApplicationEventPublisher eventPublisher;
 
     public AuthServiceImpl(
             UserRepository userRepository,
@@ -38,7 +39,8 @@ public class AuthServiceImpl implements AuthService {
             WishlistRepository wishlistRepository,
             PasswordEncoder passwordEncoder,
             AuthenticationManager authenticationManager,
-            JwtTokenProvider tokenProvider
+            JwtTokenProvider tokenProvider,
+            org.springframework.context.ApplicationEventPublisher eventPublisher
     ) {
         this.userRepository = userRepository;
         this.cartRepository = cartRepository;
@@ -46,6 +48,7 @@ public class AuthServiceImpl implements AuthService {
         this.passwordEncoder = passwordEncoder;
         this.authenticationManager = authenticationManager;
         this.tokenProvider = tokenProvider;
+        this.eventPublisher = eventPublisher;
     }
 
     @Override
@@ -77,6 +80,9 @@ public class AuthServiceImpl implements AuthService {
 
         Wishlist wishlist = Wishlist.builder().user(savedUser).build();
         wishlistRepository.save(wishlist);
+
+        // Publish registration event for asynchronous welcome notification
+        eventPublisher.publishEvent(new com.jpbazaar.event.UserRegisteredEvent(savedUser));
 
         Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(cleanEmail, request.password())

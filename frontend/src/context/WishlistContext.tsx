@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { Wishlist, WishlistItem, Product } from '../types';
 import { wishlistService } from '../services/wishlistService';
 import { useAuth } from './AuthContext';
@@ -57,8 +57,8 @@ export const WishlistProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     [items]
   );
 
-  const toggleWishlist = async (product: Product) => {
-    const isPresent = isInWishlist(product.id);
+  const toggleWishlist = useCallback(async (product: Product) => {
+    const isPresent = items.some((item) => item.productId === product.id);
 
     if (isAuthenticated) {
       setIsLoading(true);
@@ -80,9 +80,11 @@ export const WishlistProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     } else {
       // Guest mode
       if (isPresent) {
-        const next = guestWishlist.filter((item) => item.productId !== product.id);
-        setGuestWishlist(next);
-        localStorage.setItem('jpbazaar_guest_wishlist', JSON.stringify(next));
+        setGuestWishlist((prev) => {
+          const next = prev.filter((item) => item.productId !== product.id);
+          localStorage.setItem('jpbazaar_guest_wishlist', JSON.stringify(next));
+          return next;
+        });
         showToast(`${product.name} removed from saved items.`, 'info');
       } else {
         const newItem: WishlistItem = {
@@ -94,15 +96,17 @@ export const WishlistProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           imageUrl: product.imageUrls?.[0] || product.images?.[0]?.imageUrl || '',
           addedAt: new Date().toISOString(),
         };
-        const next = [...guestWishlist, newItem];
-        setGuestWishlist(next);
-        localStorage.setItem('jpbazaar_guest_wishlist', JSON.stringify(next));
+        setGuestWishlist((prev) => {
+          const next = [...prev, newItem];
+          localStorage.setItem('jpbazaar_guest_wishlist', JSON.stringify(next));
+          return next;
+        });
         showToast(`${product.name} saved to private wishlist.`, 'success');
       }
     }
-  };
+  }, [items, isAuthenticated, showToast]);
 
-  const removeItem = async (productId: number) => {
+  const removeItem = useCallback(async (productId: number) => {
     if (isAuthenticated) {
       try {
         const updated = await wishlistService.removeFromWishlist(productId);
@@ -112,14 +116,16 @@ export const WishlistProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         showToast(err.message || 'Failed to remove item.', 'error');
       }
     } else {
-      const next = guestWishlist.filter((item) => item.productId !== productId);
-      setGuestWishlist(next);
-      localStorage.setItem('jpbazaar_guest_wishlist', JSON.stringify(next));
+      setGuestWishlist((prev) => {
+        const next = prev.filter((item) => item.productId !== productId);
+        localStorage.setItem('jpbazaar_guest_wishlist', JSON.stringify(next));
+        return next;
+      });
       showToast('Item removed from saved items.', 'info');
     }
-  };
+  }, [isAuthenticated, showToast]);
 
-  const clearWishlist = async () => {
+  const clearWishlist = useCallback(async () => {
     if (isAuthenticated) {
       try {
         await wishlistService.clearWishlist();
@@ -133,22 +139,32 @@ export const WishlistProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       localStorage.removeItem('jpbazaar_guest_wishlist');
       showToast('Saved items cleared.', 'info');
     }
-  };
+  }, [isAuthenticated, showToast]);
+
+  const value = useMemo(() => ({
+    wishlist,
+    items,
+    wishlistCount,
+    isLoading,
+    isInWishlist,
+    toggleWishlist,
+    removeItem,
+    clearWishlist,
+    refreshWishlist: loadServerWishlist,
+  }), [
+    wishlist,
+    items,
+    wishlistCount,
+    isLoading,
+    isInWishlist,
+    toggleWishlist,
+    removeItem,
+    clearWishlist,
+    loadServerWishlist,
+  ]);
 
   return (
-    <WishlistContext.Provider
-      value={{
-        wishlist,
-        items,
-        wishlistCount,
-        isLoading,
-        isInWishlist,
-        toggleWishlist,
-        removeItem,
-        clearWishlist,
-        refreshWishlist: loadServerWishlist,
-      }}
-    >
+    <WishlistContext.Provider value={value}>
       {children}
     </WishlistContext.Provider>
   );

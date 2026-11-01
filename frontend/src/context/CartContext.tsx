@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { Cart, CartItem } from '../types';
 import { cartService } from '../services/cartService';
 import { useAuth } from './AuthContext';
@@ -34,9 +34,9 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState<boolean>(false);
 
-  const openDrawer = () => setIsDrawerOpen(true);
-  const closeDrawer = () => setIsDrawerOpen(false);
-  const toggleDrawer = () => setIsDrawerOpen((prev) => !prev);
+  const openDrawer = useCallback(() => setIsDrawerOpen(true), []);
+  const closeDrawer = useCallback(() => setIsDrawerOpen(false), []);
+  const toggleDrawer = useCallback(() => setIsDrawerOpen((prev) => !prev), []);
 
   // Sync / Load Cart
   const loadServerCart = useCallback(async () => {
@@ -55,8 +55,10 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     if (isAuthenticated) {
       const syncGuestItems = async () => {
-        if (guestItems.length > 0) {
-          for (const item of guestItems) {
+        const saved = localStorage.getItem('jpbazaar_guest_cart');
+        const itemsToSync: CartItem[] = saved ? JSON.parse(saved) : [];
+        if (itemsToSync.length > 0) {
+          for (const item of itemsToSync) {
             try {
               await cartService.addToCart({ productId: item.productId, quantity: item.quantity });
             } catch {}
@@ -70,7 +72,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } else {
       setCart(null);
     }
-  }, [isAuthenticated, guestItems, loadServerCart]);
+  }, [isAuthenticated, loadServerCart]);
 
   // Save guest items to localStorage
   useEffect(() => {
@@ -79,7 +81,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [guestItems, isAuthenticated]);
 
-  const addToCart = async (
+  const addToCart = useCallback(async (
     productId: number,
     quantity = 1,
     productName = 'Product',
@@ -124,11 +126,26 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
       showToast(`Added ${quantity > 1 ? quantity + 'x ' : ''}"${productName}" to your cart.`, 'success');
     }
-  };
+  }, [isAuthenticated, showToast]);
 
-  const updateQuantity = async (itemId: number, quantity: number) => {
+  const updateQuantity = useCallback(async (itemId: number, quantity: number) => {
     if (quantity <= 0) {
-      return removeItem(itemId);
+      if (isAuthenticated) {
+        setIsLoading(true);
+        try {
+          const updated = await cartService.removeItem(itemId);
+          setCart(updated);
+          showToast('Item removed from cart', 'info');
+        } catch (err: any) {
+          showToast(err.message || 'Failed to remove item', 'error');
+        } finally {
+          setIsLoading(false);
+        }
+      } else {
+        setGuestItems((prev) => prev.filter((i) => i.id !== itemId));
+        showToast('Item removed from cart', 'info');
+      }
+      return;
     }
 
     if (isAuthenticated) {
@@ -150,9 +167,9 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         )
       );
     }
-  };
+  }, [isAuthenticated, showToast]);
 
-  const removeItem = async (itemId: number) => {
+  const removeItem = useCallback(async (itemId: number) => {
     if (isAuthenticated) {
       setIsLoading(true);
       try {
@@ -168,9 +185,9 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setGuestItems((prev) => prev.filter((i) => i.id !== itemId));
       showToast('Item removed from cart', 'info');
     }
-  };
+  }, [isAuthenticated, showToast]);
 
-  const clearCart = async () => {
+  const clearCart = useCallback(async () => {
     if (isAuthenticated) {
       try {
         await cartService.clearCart();
@@ -180,13 +197,13 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setGuestItems([]);
       localStorage.removeItem('jpbazaar_guest_cart');
     }
-  };
+  }, [isAuthenticated]);
 
   const activeItems = isAuthenticated ? cart?.items || [] : guestItems;
   const totalCount = activeItems.reduce((sum, item) => sum + item.quantity, 0);
   const totalAmount = activeItems.reduce((sum, item) => sum + item.subtotal, 0);
 
-  const value = {
+  const value = useMemo(() => ({
     cart,
     guestItems,
     isLoading,
@@ -200,7 +217,21 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     clearCart,
     totalCount,
     totalAmount,
-  };
+  }), [
+    cart,
+    guestItems,
+    isLoading,
+    isDrawerOpen,
+    openDrawer,
+    closeDrawer,
+    toggleDrawer,
+    addToCart,
+    updateQuantity,
+    removeItem,
+    clearCart,
+    totalCount,
+    totalAmount,
+  ]);
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
 };

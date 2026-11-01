@@ -185,13 +185,21 @@ export const OrdersPage: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-6 self-end sm:self-auto">
+                  <div className="flex items-center gap-4 self-end sm:self-auto">
                     <div className="text-right">
                       <span className="text-[10px] text-luxury-muted uppercase tracking-wider block">Total Amount</span>
                       <span className="font-serif font-bold text-base text-luxury-gold">
-                        ${Number(order.totalAmount).toFixed(2)}
+                        ₹{Number(order.totalAmount).toFixed(2)}
                       </span>
                     </div>
+                    <Link
+                      to={`/account/orders/${order.id}/track`}
+                      onClick={(e) => e.stopPropagation()}
+                      className="px-3 py-1.5 text-xs font-semibold text-luxury-gold border border-luxury-gold/50 rounded hover:bg-luxury-gold hover:text-luxury-black transition-colors flex items-center gap-1.5 shrink-0"
+                    >
+                      <Package size={13} />
+                      <span>Track</span>
+                    </Link>
                     {isExpanded ? <ChevronUp size={18} className="text-luxury-muted" /> : <ChevronDown size={18} className="text-luxury-muted" />}
                   </div>
                 </div>
@@ -307,9 +315,15 @@ export const OrdersPage: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* Cancellation Trigger */}
-                    {isCancellable && (
-                      <div className="pt-4 border-t border-luxury-border flex justify-end">
+                    {/* Action Bar */}
+                    <div className="pt-4 border-t border-luxury-border flex flex-wrap items-center justify-between gap-3">
+                      <Link to={`/account/orders/${order.id}/track`}>
+                        <Button variant="outline" size="sm" leftIcon={<Package size={14} />}>
+                          Track Consignment Progression
+                        </Button>
+                      </Link>
+
+                      {isCancellable && (
                         <Button
                           variant="danger"
                           size="sm"
@@ -319,8 +333,8 @@ export const OrdersPage: React.FC = () => {
                         >
                           Request Consignment Cancellation
                         </Button>
-                      </div>
-                    )}
+                      )}
+                    </div>
                   </div>
                 )}
               </div>

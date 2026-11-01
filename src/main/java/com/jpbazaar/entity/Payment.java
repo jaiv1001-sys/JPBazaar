@@ -10,7 +10,8 @@ import java.time.OffsetDateTime;
 @Entity
 @Table(name = "payments", indexes = {
         @Index(name = "idx_payments_order_id", columnList = "order_id"),
-        @Index(name = "idx_payments_transaction_id", columnList = "transaction_id")
+        @Index(name = "idx_payments_transaction_id", columnList = "transaction_id"),
+        @Index(name = "idx_payments_razorpay_order_id", columnList = "razorpay_order_id")
 }, uniqueConstraints = {
         @UniqueConstraint(name = "uk_payments_order", columnNames = "order_id"),
         @UniqueConstraint(name = "uk_payments_transaction", columnNames = "transaction_id")
@@ -34,6 +35,12 @@ public class Payment {
 
     @Column(name = "transaction_id", nullable = false, unique = true, length = 100)
     private String transactionId;
+
+    @Column(name = "razorpay_order_id", length = 100)
+    private String razorpayOrderId;
+
+    @Column(name = "razorpay_signature", length = 255)
+    private String razorpaySignature;
 
     @Column(name = "amount", nullable = false, precision = 12, scale = 2)
     private BigDecimal amount;

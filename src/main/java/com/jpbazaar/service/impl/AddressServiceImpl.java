@@ -115,15 +115,16 @@ public class AddressServiceImpl implements AddressService {
         Address address = addressRepository.findById(addressId)
                 .orElseThrow(() -> new ResourceNotFoundException("Address not found with ID: " + addressId));
 
-        if (!address.getUser().getEmail().equals(email)) {
+        if (email == null || !address.getUser().getEmail().equalsIgnoreCase(email.trim())) {
             throw new UnauthorizedException("Access denied: You do not own address ID " + addressId);
         }
         return address;
     }
 
     private User getUserByEmail(String email) {
-        return userRepository.findByEmail(email)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found with email: " + email));
+        String cleanEmail = email != null ? email.trim() : "";
+        return userRepository.findByEmailIgnoreCase(cleanEmail)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with email: " + cleanEmail));
     }
 
     private void unsetPreviousDefaultAddress(Long userId) {

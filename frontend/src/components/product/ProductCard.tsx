@@ -12,7 +12,7 @@ interface ProductCardProps {
   onQuickView?: (product: Product) => void;
 }
 
-export const ProductCard: React.FC<ProductCardProps> = ({ product, onQuickView }) => {
+export const ProductCard: React.FC<ProductCardProps> = React.memo(({ product, onQuickView }) => {
   const { addToCart } = useCart();
   const { isInWishlist, toggleWishlist } = useWishlist();
 
@@ -191,4 +191,6 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onQuickView }
       </div>
     </div>
   );
-};
+});
+
+ProductCard.displayName = 'ProductCard';

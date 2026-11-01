@@ -209,7 +209,8 @@ export type OrderStatus =
   | 'SHIPPED'
   | 'OUT_FOR_DELIVERY'
   | 'DELIVERED'
-  | 'CANCELLED';
+  | 'CANCELLED'
+  | 'REFUNDED';
 
 export type PaymentMethod = 'CARD' | 'UPI' | 'NET_BANKING' | 'COD';
 export type PaymentStatus = 'PENDING' | 'SUCCESS' | 'FAILED' | 'REFUNDED';
@@ -249,12 +250,52 @@ export interface CreateOrderRequest {
 
 export interface UpdateOrderStatusRequest {
   status: OrderStatus;
+  notes?: string;
+  carrier?: string;
+  trackingNumber?: string;
+  estimatedDeliveryDate?: string;
+}
+
+export interface OrderStatusHistory {
+  id: number;
+  status: OrderStatus;
+  notes?: string;
+  updatedBy?: string;
+  createdAt: string;
+}
+
+export interface TrackingCheckpoint {
+  step: number;
+  status: OrderStatus;
+  label: string;
+  description: string;
+  completed: boolean;
+  current: boolean;
+  timestamp?: string;
+}
+
+export interface OrderTrackingResponse {
+  orderId: number;
+  currentStatus: OrderStatus;
+  carrier?: string;
+  trackingNumber?: string;
+  estimatedDeliveryDate?: string;
+  shippedAt?: string;
+  deliveredAt?: string;
+  deliveryNotes?: string;
+  totalAmount: number;
+  recipientName?: string;
+  deliveryAddress?: string;
+  items: OrderItem[];
+  checkpoints: TrackingCheckpoint[];
+  history: OrderStatusHistory[];
 }
 
 export interface Payment {
   id: number;
   orderId: number;
   transactionId: string;
+  razorpayOrderId?: string;
   amount: number;
   method: PaymentMethod;
   status: PaymentStatus;
@@ -265,6 +306,25 @@ export interface PaymentProcessRequest {
   orderId: number;
   paymentMethod: PaymentMethod;
   simulateFailure?: boolean;
+}
+
+export interface RazorpayOrderResponse {
+  razorpayOrderId: string;
+  keyId: string;
+  amount: number;
+  amountInPaise: number;
+  currency: string;
+  orderId: number;
+  customerName: string;
+  customerEmail: string;
+  customerContact: string;
+}
+
+export interface RazorpayVerificationRequest {
+  orderId: number;
+  razorpayOrderId: string;
+  razorpayPaymentId: string;
+  razorpaySignature: string;
 }
 
 // Reviews

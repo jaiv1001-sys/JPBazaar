@@ -16,14 +16,16 @@ import java.util.List;
         @Index(name = "idx_orders_user_id", columnList = "user_id"),
         @Index(name = "idx_orders_status", columnList = "status"),
         @Index(name = "idx_orders_created_at", columnList = "created_at"),
-        @Index(name = "idx_orders_status_created_at", columnList = "status, created_at")
+        @Index(name = "idx_orders_status_created_at", columnList = "status, created_at"),
+        @Index(name = "idx_orders_user_status", columnList = "user_id, status"),
+        @Index(name = "idx_orders_tracking_number", columnList = "tracking_number")
 })
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@ToString(exclude = {"user", "address", "items", "payment"})
+@ToString(exclude = {"user", "address", "items", "payment", "statusHistory"})
 @EqualsAndHashCode(of = "id")
 public class Order {
 
@@ -47,6 +49,24 @@ public class Order {
     @Builder.Default
     private OrderStatus status = OrderStatus.PLACED;
 
+    @Column(name = "carrier", length = 100)
+    private String carrier;
+
+    @Column(name = "tracking_number", length = 100)
+    private String trackingNumber;
+
+    @Column(name = "estimated_delivery_date")
+    private OffsetDateTime estimatedDeliveryDate;
+
+    @Column(name = "shipped_at")
+    private OffsetDateTime shippedAt;
+
+    @Column(name = "delivered_at")
+    private OffsetDateTime deliveredAt;
+
+    @Column(name = "delivery_notes", length = 500)
+    private String deliveryNotes;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;
@@ -63,6 +83,12 @@ public class Order {
     @OneToOne(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private Payment payment;
 
+    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("createdAt ASC")
+    @BatchSize(size = 25)
+    @Builder.Default
+    private List<OrderStatusHistory> statusHistory = new ArrayList<>();
+
     // Helper methods
     public void addOrderItem(OrderItem item) {
         items.add(item);
@@ -74,5 +100,22 @@ public class Order {
         if (payment != null) {
             payment.setOrder(this);
         }
+    }
+
+    public void addStatusHistory(OrderStatusHistory history) {
+        if (history != null) {
+            history.setOrder(this);
+            statusHistory.add(history);
+        }
+    }
+
+    public void addStatusHistory(OrderStatus newStatus, String notes, String updatedBy) {
+        OrderStatusHistory history = OrderStatusHistory.builder()
+                .order(this)
+                .status(newStatus)
+                .notes(notes)
+                .updatedBy(updatedBy != null ? updatedBy : "SYSTEM")
+                .build();
+        statusHistory.add(history);
     }
 }

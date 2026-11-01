@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { User, LoginRequest, RegisterRequest } from '../types';
 import { authService } from '../services/authService';
 
@@ -60,7 +60,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => window.removeEventListener('jpbazaar:unauthorized', handleUnauthorized);
   }, [token, refreshProfile, logout]);
 
-  const login = async (credentials: LoginRequest) => {
+  const login = useCallback(async (credentials: LoginRequest) => {
     setIsLoading(true);
     try {
       const res = await authService.login(credentials);
@@ -73,9 +73,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
-  const register = async (data: RegisterRequest) => {
+  const register = useCallback(async (data: RegisterRequest) => {
     setIsLoading(true);
     try {
       const res = await authService.register(data);
@@ -88,9 +88,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
-  const value = {
+  const value = useMemo(() => ({
     user,
     token,
     isLoading,
@@ -100,7 +100,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     register,
     logout,
     refreshProfile,
-  };
+  }), [user, token, isLoading, login, register, logout, refreshProfile]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

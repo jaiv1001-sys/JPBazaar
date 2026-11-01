@@ -32,12 +32,21 @@ jwt:
   secret: 404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970
   expiration-ms: 86400000
 
+razorpay:
+  key-id: rzp_test_mockKeyForTesting123
+  key-secret: mockSecretKeyForTesting456
+  webhook-secret: mockWebhookSecretForTesting789
+  currency: INR
+  enabled: true
+
 app:
   upload:
     dir: target/test-uploads
+  mail:
+    enabled: false
   security:
     rate-limit:
-      enabled: true
+      enabled: false
       use-redis: false
     cors:
       allowed-origins: http://localhost:3000,http://localhost:5173,http://localhost:8080

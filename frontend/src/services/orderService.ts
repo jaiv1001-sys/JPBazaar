@@ -1,5 +1,5 @@
 import { api } from './api';
-import { Order, CreateOrderRequest, UpdateOrderStatusRequest, PageResponse } from '../types';
+import { Order, CreateOrderRequest, UpdateOrderStatusRequest, PageResponse, OrderTrackingResponse } from '../types';
 
 export const orderService = {
   async placeOrder(data: CreateOrderRequest): Promise<Order> {
@@ -12,6 +12,10 @@ export const orderService = {
 
   async getOrderById(id: number): Promise<Order> {
     return api.get(`/api/orders/${id}`);
+  },
+
+  async getOrderTracking(id: number): Promise<OrderTrackingResponse> {
+    return api.get(`/api/orders/${id}/tracking`);
   },
 
   async cancelOrder(id: number): Promise<Order> {

@@ -143,10 +143,11 @@ public class CartServiceImpl implements CartService {
     }
 
     private Cart getOrCreateCart(String userEmail) {
-        return cartRepository.findByUserEmailWithItems(userEmail)
+        String cleanEmail = userEmail != null ? userEmail.trim() : "";
+        return cartRepository.findByUserEmailWithItems(cleanEmail)
                 .orElseGet(() -> {
-                    User user = userRepository.findByEmail(userEmail)
-                            .orElseThrow(() -> new ResourceNotFoundException("User not found with email: " + userEmail));
+                    User user = userRepository.findByEmailIgnoreCase(cleanEmail)
+                            .orElseThrow(() -> new ResourceNotFoundException("User not found with email: " + cleanEmail));
 
                     Cart newCart = Cart.builder()
                             .user(user)

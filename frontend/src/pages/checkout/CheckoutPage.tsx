@@ -4,6 +4,7 @@ import { Address, PaymentMethod, Order, Payment } from '../../types';
 import { addressService } from '../../services/addressService';
 import { orderService } from '../../services/orderService';
 import { paymentService } from '../../services/paymentService';
+import { razorpayService } from '../../services/razorpayService';
 import { useCart } from '../../context/CartContext';
 import { useToast } from '../../context/ToastContext';
 import { AddressModal } from '../../components/account/AddressModal';
@@ -23,6 +24,7 @@ import {
   Lock,
   Plus,
   Building,
+  Sparkles,
 } from 'lucide-react';
 
 export const CheckoutPage: React.FC = () => {
@@ -54,9 +56,12 @@ const CheckoutContent: React.FC = () => {
   const [deliveryNotes, setDeliveryNotes] = useState<string>('');
 
   // Payment state
+  const [gatewayMode, setGatewayMode] = useState<'RAZORPAY' | 'SIMULATED'>('RAZORPAY');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('CARD');
   const [simulateFailure, setSimulateFailure] = useState<boolean>(false);
   const [isProcessingPayment, setIsProcessingPayment] = useState<boolean>(false);
+  const [activeOrder, setActiveOrder] = useState<Order | null>(null);
+  const [razorpayError, setRazorpayError] = useState<string | null>(null);
 
   // Card Inputs Mock
   const [cardName, setCardName] = useState<string>('Alexander Vance');
@@ -157,6 +162,60 @@ const CheckoutContent: React.FC = () => {
     } catch (err: any) {
       showToast(err.message || 'Settlement failed. Please verify credentials or retry.', 'error');
     } finally {
+      setIsProcessingPayment(false);
+    }
+  };
+
+  const handleRazorpaySettlement = async () => {
+    if (!selectedAddressId) {
+      showToast('Delivery residence missing.', 'error');
+      setCurrentStep(1);
+      return;
+    }
+
+    setIsProcessingPayment(true);
+    setRazorpayError(null);
+
+    try {
+      // 1. Atomically place or reuse existing in-progress order
+      let orderToSettle = activeOrder;
+      if (!orderToSettle) {
+        orderToSettle = await orderService.placeOrder({
+          addressId: selectedAddressId,
+          paymentMethod: 'CARD', // Razorpay modal supports Card, UPI, NetBanking
+          notes: deliveryNotes.trim() || undefined,
+        });
+        setActiveOrder(orderToSettle);
+      }
+
+      // 2. Initiate Razorpay order on backend
+      const rzpOrder = await razorpayService.createOrder(orderToSettle.id);
+
+      // 3. Open Razorpay Checkout modal with gold luxury theme
+      await razorpayService.openCheckout(
+        rzpOrder,
+        async (verifiedPayment) => {
+          await clearCart();
+          setCompletedOrder(orderToSettle);
+          setCompletedPayment(verifiedPayment);
+          setCurrentStep(4);
+          showToast('Payment verified via Razorpay! Consignment confirmed.', 'success');
+          setIsProcessingPayment(false);
+        },
+        (errMsg) => {
+          setRazorpayError(errMsg);
+          showToast(errMsg, 'error');
+          setIsProcessingPayment(false);
+        },
+        () => {
+          showToast('Payment modal closed. You can retry settlement when ready.', 'info');
+          setIsProcessingPayment(false);
+        }
+      );
+    } catch (err: any) {
+      const msg = err.message || 'Settlement initiation failed. Please try again.';
+      setRazorpayError(msg);
+      showToast(msg, 'error');
       setIsProcessingPayment(false);
     }
   };
@@ -454,127 +513,243 @@ const CheckoutContent: React.FC = () => {
             </h2>
           </div>
 
-          {/* Simulated Disclaimer Banner */}
-          <div className="p-4 bg-luxury-surface border border-luxury-gold/50 rounded-sm flex items-start gap-3 text-xs text-luxury-muted">
-            <ShieldCheck size={20} className="text-luxury-gold shrink-0 mt-0.5" />
-            <div>
-              <strong className="text-luxury-gold font-bold block mb-0.5">
-                Simulated Gateway Demonstration Protocol
-              </strong>
-              JPBazaar operates a simulated transaction gateway. No financial credit or debit card is charged. Transactions are immediately reconciled with our Spring Boot order state machine.
-            </div>
+          {/* Protocol / Gateway Engine Switcher */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <button
+              type="button"
+              onClick={() => {
+                setGatewayMode('RAZORPAY');
+                setRazorpayError(null);
+              }}
+              className={`p-4 rounded-sm border text-left transition-all relative flex flex-col justify-between ${
+                gatewayMode === 'RAZORPAY'
+                  ? 'bg-luxury-surface border-luxury-gold shadow-gold-sm ring-1 ring-luxury-gold'
+                  : 'bg-luxury-surface/50 border-luxury-border hover:border-luxury-muted'
+              }`}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-bold uppercase tracking-wider text-luxury-white flex items-center gap-1.5">
+                  <Sparkles size={15} className="text-luxury-gold" />
+                  Razorpay Secure Gateway
+                </span>
+                <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded-full bg-luxury-gold/20 text-luxury-gold border border-luxury-gold/40">
+                  Test Mode Active
+                </span>
+              </div>
+              <p className="text-[11px] text-luxury-muted leading-relaxed">
+                Official Razorpay checkout modal with Card, Instant UPI QR, NetBanking, and Wallets.
+              </p>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setGatewayMode('SIMULATED')}
+              className={`p-4 rounded-sm border text-left transition-all relative flex flex-col justify-between ${
+                gatewayMode === 'SIMULATED'
+                  ? 'bg-luxury-surface border-luxury-gold shadow-gold-sm ring-1 ring-luxury-gold'
+                  : 'bg-luxury-surface/50 border-luxury-border hover:border-luxury-muted'
+              }`}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-bold uppercase tracking-wider text-luxury-white flex items-center gap-1.5">
+                  <ShieldCheck size={15} className="text-luxury-gold" />
+                  Internal Simulation / COD
+                </span>
+                <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded-full bg-luxury-elevated text-luxury-muted border border-luxury-border">
+                  Simulation Fallback
+                </span>
+              </div>
+              <p className="text-[11px] text-luxury-muted leading-relaxed">
+                Developer simulation harness with error injection and Cash on Delivery handover.
+              </p>
+            </button>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <div className="lg:col-span-2 space-y-6">
-              {/* Payment Method Selector Tabs */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {[
-                  { id: 'CARD' as PaymentMethod, label: 'Credit Card', icon: CreditCard },
-                  { id: 'UPI' as PaymentMethod, label: 'Instant UPI', icon: Lock },
-                  { id: 'NET_BANKING' as PaymentMethod, label: 'Wire Transfer', icon: Building },
-                  { id: 'COD' as PaymentMethod, label: 'Consignment Handover', icon: Truck },
-                ].map((m) => {
-                  const Icon = m.icon;
-                  const isSelected = paymentMethod === m.id;
-                  return (
-                    <button
-                      key={m.id}
-                      type="button"
-                      onClick={() => setPaymentMethod(m.id)}
-                      className={`p-4 rounded-sm border text-center transition-all flex flex-col items-center justify-center gap-2 ${
-                        isSelected
-                          ? 'bg-luxury-surface border-luxury-gold shadow-gold-sm text-luxury-white'
-                          : 'bg-luxury-surface/40 border-luxury-border text-luxury-muted hover:text-luxury-white'
-                      }`}
-                    >
-                      <Icon size={20} className={isSelected ? 'text-luxury-gold' : 'text-luxury-muted'} />
-                      <span className="text-xs font-bold uppercase tracking-wider">{m.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
+              {gatewayMode === 'RAZORPAY' ? (
+                <div className="p-6 bg-luxury-surface border border-luxury-gold/50 rounded-sm space-y-4">
+                  <div className="flex items-center justify-between border-b border-luxury-border pb-3">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-full bg-luxury-gold/10 border border-luxury-gold/30 flex items-center justify-center text-luxury-gold">
+                        <Lock size={16} />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-serif font-bold text-luxury-white">
+                          Razorpay Standard Checkout
+                        </h4>
+                        <span className="text-[11px] text-luxury-muted">
+                          Official PCI-DSS Level 1 Compliant Modal
+                        </span>
+                      </div>
+                    </div>
+                    <span className="text-[11px] font-mono text-luxury-gold font-bold px-2 py-1 bg-luxury-gold/10 rounded">
+                      Sandbox Test Mode
+                    </span>
+                  </div>
 
-              {/* Method Mock Input Details */}
-              <div className="bg-luxury-surface border border-luxury-border p-6 rounded-sm space-y-4">
-                {paymentMethod === 'CARD' && (
-                  <div className="space-y-4">
-                    <Input
-                      label="Cardholder Full Name"
-                      value={cardName}
-                      onChange={(e) => setCardName(e.target.value)}
-                    />
-                    <Input
-                      label="Simulated Card Number"
-                      value={cardNumber}
-                      onChange={(e) => setCardNumber(e.target.value)}
-                    />
-                    <div className="grid grid-cols-2 gap-4">
-                      <Input
-                        label="Expiry Date"
-                        value={cardExpiry}
-                        onChange={(e) => setCardExpiry(e.target.value)}
-                      />
-                      <Input
-                        label="CVV / CVC"
-                        type="password"
-                        value={cardCvv}
-                        onChange={(e) => setCardCvv(e.target.value)}
-                      />
+                  <p className="text-xs text-luxury-muted leading-relaxed">
+                    Clicking the authorization button below launches the official Razorpay Checkout modal styled in JPBazaar black-and-gold. You can test transactions using test cards or any test UPI ID without real financial charges.
+                  </p>
+
+                  {/* Test Credentials Helper Box */}
+                  <div className="bg-luxury-elevated border border-luxury-border p-4 rounded-sm text-xs space-y-2">
+                    <span className="text-luxury-gold font-bold uppercase tracking-wider text-[10px] block">
+                      Recommended Test Credentials:
+                    </span>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-luxury-muted text-[11px]">
+                      <div>
+                        <span className="text-luxury-white font-medium">Test Card:</span>{' '}
+                        <code className="text-luxury-gold font-mono bg-luxury-surface px-1.5 py-0.5 rounded">4111 2222 3333 4444</code>
+                      </div>
+                      <div>
+                        <span className="text-luxury-white font-medium">Expiry / CVV:</span>{' '}
+                        <code className="text-luxury-gold font-mono bg-luxury-surface px-1.5 py-0.5 rounded">12/28 • 123</code>
+                      </div>
+                      <div>
+                        <span className="text-luxury-white font-medium">Instant UPI:</span>{' '}
+                        <code className="text-luxury-gold font-mono bg-luxury-surface px-1.5 py-0.5 rounded">success@razorpay</code>
+                      </div>
+                      <div>
+                        <span className="text-luxury-white font-medium">Test OTP:</span>{' '}
+                        <code className="text-luxury-gold font-mono bg-luxury-surface px-1.5 py-0.5 rounded">Any 6 digits (e.g. 123456)</code>
+                      </div>
                     </div>
                   </div>
-                )}
 
-                {paymentMethod === 'UPI' && (
-                  <div className="space-y-3">
-                    <Input
-                      label="Virtual Payment Address (VPA / UPI ID)"
-                      defaultValue="patron@okjpbazaar"
-                    />
-                    <p className="text-[11px] text-luxury-muted">
-                      Approval notification simulated with instant clearance.
-                    </p>
-                  </div>
-                )}
-
-                {paymentMethod === 'NET_BANKING' && (
-                  <div className="space-y-3">
-                    <label className="text-xs text-luxury-muted block">Select Banking Institution</label>
-                    <select className="w-full bg-luxury-elevated border border-luxury-border rounded-sm p-2.5 text-xs text-luxury-white focus:outline-none focus:border-luxury-gold">
-                      <option>JP Morgan Private Client Banking</option>
-                      <option>Credit Suisse Geneva</option>
-                      <option>Barclays Wealth Management</option>
-                      <option>Standard Chartered Priority</option>
-                    </select>
-                  </div>
-                )}
-
-                {paymentMethod === 'COD' && (
-                  <div className="space-y-2 text-xs text-luxury-muted">
-                    <p className="font-semibold text-luxury-white">
-                      Complimentary White-Glove Handover Settlement
-                    </p>
-                    <p>
-                      Payment is settled in-person via certified draft or encrypted terminal upon final delivery inspection.
-                    </p>
-                  </div>
-                )}
-
-                {/* Developer / QA Simulator failure toggle */}
-                <div className="pt-4 border-t border-luxury-border flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    id="simFailureCheckbox"
-                    checked={simulateFailure}
-                    onChange={(e) => setSimulateFailure(e.target.checked)}
-                    className="w-4 h-4 rounded-sm border-luxury-border bg-luxury-surface text-luxury-danger focus:ring-luxury-danger"
-                  />
-                  <label htmlFor="simFailureCheckbox" className="text-xs text-luxury-muted cursor-pointer select-none flex items-center gap-1">
-                    <AlertTriangle size={14} className="text-amber-400" />
-                    <span>Test Gateway Error Recovery (Simulate Failure)</span>
-                  </label>
+                  {razorpayError && (
+                    <div className="p-3 bg-red-950/40 border border-red-500/50 rounded-sm flex items-start gap-2 text-xs text-red-300">
+                      <AlertTriangle size={16} className="text-red-400 shrink-0 mt-0.5" />
+                      <div className="space-y-1">
+                        <strong className="block font-semibold">Settlement Disruption:</strong>
+                        <span>{razorpayError}</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              </div>
+              ) : (
+                /* Simulated Disclaimer & Selector */
+                <div className="space-y-6">
+                  <div className="p-4 bg-luxury-surface border border-luxury-gold/50 rounded-sm flex items-start gap-3 text-xs text-luxury-muted">
+                    <ShieldCheck size={20} className="text-luxury-gold shrink-0 mt-0.5" />
+                    <div>
+                      <strong className="text-luxury-gold font-bold block mb-0.5">
+                        Simulated Gateway Demonstration Protocol
+                      </strong>
+                      JPBazaar operates a simulated transaction gateway. No financial credit or debit card is charged. Transactions are immediately reconciled with our Spring Boot order state machine.
+                    </div>
+                  </div>
+
+                  {/* Payment Method Selector Tabs */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    {[
+                      { id: 'CARD' as PaymentMethod, label: 'Credit Card', icon: CreditCard },
+                      { id: 'UPI' as PaymentMethod, label: 'Instant UPI', icon: Lock },
+                      { id: 'NET_BANKING' as PaymentMethod, label: 'Wire Transfer', icon: Building },
+                      { id: 'COD' as PaymentMethod, label: 'Consignment Handover', icon: Truck },
+                    ].map((m) => {
+                      const Icon = m.icon;
+                      const isSelected = paymentMethod === m.id;
+                      return (
+                        <button
+                          key={m.id}
+                          type="button"
+                          onClick={() => setPaymentMethod(m.id)}
+                          className={`p-4 rounded-sm border text-center transition-all flex flex-col items-center justify-center gap-2 ${
+                            isSelected
+                              ? 'bg-luxury-surface border-luxury-gold shadow-gold-sm text-luxury-white'
+                              : 'bg-luxury-surface/40 border-luxury-border text-luxury-muted hover:text-luxury-white'
+                          }`}
+                        >
+                          <Icon size={20} className={isSelected ? 'text-luxury-gold' : 'text-luxury-muted'} />
+                          <span className="text-xs font-bold uppercase tracking-wider">{m.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Method Mock Input Details */}
+                  <div className="bg-luxury-surface border border-luxury-border p-6 rounded-sm space-y-4">
+                    {paymentMethod === 'CARD' && (
+                      <div className="space-y-4">
+                        <Input
+                          label="Cardholder Full Name"
+                          value={cardName}
+                          onChange={(e) => setCardName(e.target.value)}
+                        />
+                        <Input
+                          label="Simulated Card Number"
+                          value={cardNumber}
+                          onChange={(e) => setCardNumber(e.target.value)}
+                        />
+                        <div className="grid grid-cols-2 gap-4">
+                          <Input
+                            label="Expiry Date"
+                            value={cardExpiry}
+                            onChange={(e) => setCardExpiry(e.target.value)}
+                          />
+                          <Input
+                            label="CVV / CVC"
+                            type="password"
+                            value={cardCvv}
+                            onChange={(e) => setCardCvv(e.target.value)}
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {paymentMethod === 'UPI' && (
+                      <div className="space-y-3">
+                        <Input
+                          label="Virtual Payment Address (VPA / UPI ID)"
+                          defaultValue="patron@okjpbazaar"
+                        />
+                        <p className="text-[11px] text-luxury-muted">
+                          Approval notification simulated with instant clearance.
+                        </p>
+                      </div>
+                    )}
+
+                    {paymentMethod === 'NET_BANKING' && (
+                      <div className="space-y-3">
+                        <label className="text-xs text-luxury-muted block">Select Banking Institution</label>
+                        <select className="w-full bg-luxury-elevated border border-luxury-border rounded-sm p-2.5 text-xs text-luxury-white focus:outline-none focus:border-luxury-gold">
+                          <option>JP Morgan Private Client Banking</option>
+                          <option>Credit Suisse Geneva</option>
+                          <option>Barclays Wealth Management</option>
+                          <option>Standard Chartered Priority</option>
+                        </select>
+                      </div>
+                    )}
+
+                    {paymentMethod === 'COD' && (
+                      <div className="space-y-2 text-xs text-luxury-muted">
+                        <p className="font-semibold text-luxury-white">
+                          Complimentary White-Glove Handover Settlement
+                        </p>
+                        <p>
+                          Payment is settled in-person via certified draft or encrypted terminal upon final delivery inspection.
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Developer / QA Simulator failure toggle */}
+                    <div className="pt-4 border-t border-luxury-border flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="simFailureCheckbox"
+                        checked={simulateFailure}
+                        onChange={(e) => setSimulateFailure(e.target.checked)}
+                        className="w-4 h-4 rounded-sm border-luxury-border bg-luxury-surface text-luxury-danger focus:ring-luxury-danger"
+                      />
+                      <label htmlFor="simFailureCheckbox" className="text-xs text-luxury-muted cursor-pointer select-none flex items-center gap-1">
+                        <AlertTriangle size={14} className="text-amber-400" />
+                        <span>Test Gateway Error Recovery (Simulate Failure)</span>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Sidebar Final Amount */}
@@ -584,8 +759,10 @@ const CheckoutContent: React.FC = () => {
               </h4>
               <div className="space-y-2 text-xs text-luxury-muted">
                 <div className="flex justify-between">
-                  <span>Method</span>
-                  <span className="text-luxury-gold font-bold">{paymentMethod}</span>
+                  <span>Protocol</span>
+                  <span className="text-luxury-gold font-bold">
+                    {gatewayMode === 'RAZORPAY' ? 'Razorpay Test' : paymentMethod}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span>Payable Amount</span>
@@ -597,10 +774,12 @@ const CheckoutContent: React.FC = () => {
                 variant="gold"
                 size="lg"
                 fullWidth
-                onClick={handleFinalSettlement}
+                onClick={gatewayMode === 'RAZORPAY' ? handleRazorpaySettlement : handleFinalSettlement}
                 isLoading={isProcessingPayment}
               >
-                Authorize Settlement • ${finalTotal.toFixed(2)}
+                {gatewayMode === 'RAZORPAY'
+                  ? `Pay with Razorpay • $${finalTotal.toFixed(2)}`
+                  : `Authorize Settlement • $${finalTotal.toFixed(2)}`}
               </Button>
             </div>
           </div>
@@ -652,6 +831,14 @@ const CheckoutContent: React.FC = () => {
                 {completedPayment?.transactionId || 'TXN_SIMULATED_CONFIRMED'}
               </span>
             </div>
+            {completedPayment?.razorpayOrderId && (
+              <div className="flex justify-between border-b border-luxury-border pb-2">
+                <span className="text-luxury-muted">Razorpay Order Reference</span>
+                <span className="font-mono font-bold text-luxury-white">
+                  {completedPayment.razorpayOrderId}
+                </span>
+              </div>
+            )}
             <div className="flex justify-between border-b border-luxury-border pb-2">
               <span className="text-luxury-muted">Monetary Total</span>
               <span className="font-serif font-bold text-base text-luxury-white">

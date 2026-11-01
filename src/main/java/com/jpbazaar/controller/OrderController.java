@@ -65,6 +65,23 @@ public class OrderController {
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
+    @GetMapping("/api/orders/{id}/tracking")
+    @Operation(summary = "Get order tracking and milestone progress", description = "Retrieves live tracking checkpoints, courier details, and chronological audit history. IDOR protected.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Order tracking details retrieved successfully"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Forbidden (IDOR protection violation)"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Order not found")
+    })
+    public ResponseEntity<ApiResponse<com.jpbazaar.dto.response.OrderTrackingResponse>> getOrderTracking(
+            @Parameter(description = "Order ID", example = "1") @PathVariable Long id,
+            Authentication authentication
+    ) {
+        boolean isAdmin = authentication.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        com.jpbazaar.dto.response.OrderTrackingResponse response = orderService.getOrderTracking(authentication.getName(), id, isAdmin);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
     @GetMapping("/api/orders")
     @Operation(summary = "Get current user's order history", description = "Retrieves paginated orders for the authenticated user, optionally filtered by status.")
     @ApiResponses({

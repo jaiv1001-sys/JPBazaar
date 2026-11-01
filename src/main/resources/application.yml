@@ -12,12 +12,15 @@ spring:
     password: ${DB_PASSWORD:postgres}
     driver-class-name: org.postgresql.Driver
     hikari:
+      pool-name: JPBazaarHikariCP
       maximum-pool-size: 10
       minimum-idle: 2
       idle-timeout: 300000
+      max-lifetime: 1800000
       connection-timeout: 20000
 
   jpa:
+    open-in-view: false
     database-platform: org.hibernate.dialect.PostgreSQLDialect
     hibernate:
       ddl-auto: ${JPA_DDL_AUTO:validate}
@@ -45,12 +48,28 @@ spring:
       password: ${REDIS_PASSWORD:}
       timeout: 2000ms
 
+  mail:
+    host: ${SPRING_MAIL_HOST:smtp.gmail.com}
+    port: ${SPRING_MAIL_PORT:587}
+    username: ${SPRING_MAIL_USERNAME:concierge@jpbazaar.com}
+    password: ${SPRING_MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
+
 server:
   port: ${SERVER_PORT:8080}
   shutdown: graceful
   error:
-    include-message: always
-    include-binding-errors: always
+    include-message: ${SERVER_ERROR_INCLUDE_MESSAGE:never}
+    include-binding-errors: ${SERVER_ERROR_INCLUDE_BINDING_ERRORS:never}
 
 management:
   endpoints:
@@ -60,7 +79,7 @@ management:
       base-path: /actuator
   endpoint:
     health:
-      show-details: always
+      show-details: ${MANAGEMENT_HEALTH_SHOW_DETAILS:when-authorized}
       probes:
         enabled: true
     prometheus:
@@ -88,9 +107,28 @@ jwt:
   secret: ${JWT_SECRET:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
   expiration-ms: ${JWT_EXPIRATION_MS:86400000} # 24 Hours in Milliseconds
 
+razorpay:
+  key-id: ${RAZORPAY_KEY_ID:rzp_test_JPBazaarDemoKey123}
+  key-secret: ${RAZORPAY_KEY_SECRET:JPBazaarDemoSecretKey456}
+  webhook-secret: ${RAZORPAY_WEBHOOK_SECRET:JPBazaarWebhookSecret789}
+  currency: ${RAZORPAY_CURRENCY:INR}
+  enabled: ${RAZORPAY_ENABLED:true}
+
+cloudinary:
+  enabled: ${CLOUDINARY_ENABLED:false}
+  cloud-name: ${CLOUDINARY_CLOUD_NAME:}
+  api-key: ${CLOUDINARY_API_KEY:}
+  api-secret: ${CLOUDINARY_API_SECRET:}
+
 app:
+  frontend:
+    url: ${APP_FRONTEND_URL:http://localhost:5173}
   upload:
     dir: ${UPLOAD_DIR:uploads/images}
+  mail:
+    enabled: ${APP_MAIL_ENABLED:true}
+    from: ${APP_MAIL_FROM:concierge@jpbazaar.com}
+    from-name: ${APP_MAIL_FROM_NAME:JPBazaar Luxury Concierge}
   security:
     rate-limit:
       enabled: ${RATE_LIMIT_ENABLED:true}

@@ -27,5 +27,12 @@ node_modules/
 frontend/node_modules/
 dist/
 frontend/dist/
+frontend/tsconfig.tsbuildinfo
 .vite/
+.vercel/
+
+# Runtime Storage & Logs
+uploads/
+*.log
+logs/
 

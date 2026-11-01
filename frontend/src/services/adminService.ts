@@ -11,6 +11,7 @@ import {
   PageResponse,
   Order,
   OrderStatus,
+  UpdateOrderStatusRequest,
 } from '../types';
 
 export const adminService = {
@@ -50,7 +51,11 @@ export const adminService = {
     return api.get('/api/admin/orders', { params: { status: status || undefined, page, size } });
   },
 
-  async updateOrderStatus(orderId: number, status: OrderStatus): Promise<Order> {
-    return api.put(`/api/orders/${orderId}/status`, { status });
+  async updateOrderStatus(
+    orderId: number,
+    data: UpdateOrderStatusRequest | OrderStatus
+  ): Promise<Order> {
+    const payload = typeof data === 'string' ? { status: data } : data;
+    return api.put(`/api/orders/${orderId}/status`, payload);
   },
 };

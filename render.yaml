@@ -1,0 +1,63 @@
+services:
+  # ----------------------------------------------------------------------------
+  # Backend Spring Boot 3 Web Service (Docker Runtime)
+  # ----------------------------------------------------------------------------
+  - type: web
+    name: jpbazaar-api
+    runtime: docker
+    dockerfilePath: Dockerfile
+    plan: free
+    region: oregon
+    healthCheckPath: /actuator/health
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: prod
+      - key: DB_URL
+        fromDatabase:
+          name: jpbazaar-db
+          property: connectionString
+      - key: DB_USERNAME
+        fromDatabase:
+          name: jpbazaar-db
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: jpbazaar-db
+          property: password
+      - key: JPA_DDL_AUTO
+        value: validate
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRATION_MS
+        value: 86400000
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false
+      - key: APP_FRONTEND_URL
+        sync: false
+      - key: RAZORPAY_KEY_ID
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
+      - key: RAZORPAY_WEBHOOK_SECRET
+        sync: false
+      - key: SPRING_MAIL_HOST
+        sync: false
+      - key: SPRING_MAIL_PORT
+        value: 587
+      - key: SPRING_MAIL_USERNAME
+        sync: false
+      - key: SPRING_MAIL_PASSWORD
+        sync: false
+      - key: APP_MAIL_ENABLED
+        value: "true"
+
+databases:
+  # ----------------------------------------------------------------------------
+  # Managed PostgreSQL 16 Database
+  # ----------------------------------------------------------------------------
+  - name: jpbazaar-db
+    databaseName: jpbazaar
+    user: jpbazaar_user
+    plan: free
+    region: oregon
+    postgresMajorVersion: 16

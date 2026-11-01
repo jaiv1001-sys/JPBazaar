@@ -4,6 +4,8 @@
 -- =============================================================================
 
 -- Drop tables if they exist (in reverse dependency order)
+DROP TABLE IF EXISTS email_notification_logs CASCADE;
+DROP TABLE IF EXISTS order_status_history CASCADE;
 DROP TABLE IF EXISTS reviews CASCADE;
 DROP TABLE IF EXISTS payments CASCADE;
 DROP TABLE IF EXISTS order_items CASCADE;
@@ -21,7 +23,7 @@ DROP TABLE IF EXISTS users CASCADE;
 -- -----------------------------------------------------------------------------
 -- 1. USERS TABLE
 -- -----------------------------------------------------------------------------
-CREATE TABLE users (
+CREATE TABLE IF NOT EXISTS users (
     id BIGSERIAL PRIMARY KEY,
     first_name VARCHAR(50) NOT NULL,
     last_name VARCHAR(50) NOT NULL,
@@ -37,7 +39,7 @@ CREATE TABLE users (
 -- -----------------------------------------------------------------------------
 -- 2. ADDRESSES TABLE
 -- -----------------------------------------------------------------------------
-CREATE TABLE addresses (
+CREATE TABLE IF NOT EXISTS addresses (
     id BIGSERIAL PRIMARY KEY,
     user_id BIGINT NOT NULL CONSTRAINT fk_addresses_user REFERENCES users(id) ON DELETE CASCADE,
     address_line VARCHAR(255) NOT NULL,
@@ -52,7 +54,7 @@ CREATE TABLE addresses (
 -- -----------------------------------------------------------------------------
 -- 3. CATEGORIES TABLE
 -- -----------------------------------------------------------------------------
-CREATE TABLE categories (
+CREATE TABLE IF NOT EXISTS categories (
     id BIGSERIAL PRIMARY KEY,
     name VARCHAR(100) NOT NULL CONSTRAINT uk_categories_name UNIQUE,
     description TEXT,
@@ -62,7 +64,7 @@ CREATE TABLE categories (
 -- -----------------------------------------------------------------------------
 -- 4. PRODUCTS TABLE
 -- -----------------------------------------------------------------------------
-CREATE TABLE products (
+CREATE TABLE IF NOT EXISTS products (
     id BIGSERIAL PRIMARY KEY,
     category_id BIGINT NOT NULL CONSTRAINT fk_products_category REFERENCES categories(id) ON DELETE RESTRICT,
     name VARCHAR(255) NOT NULL,
@@ -83,7 +85,7 @@ CREATE TABLE products (
 -- -----------------------------------------------------------------------------
 -- 5. PRODUCT IMAGES TABLE
 -- -----------------------------------------------------------------------------
-CREATE TABLE product_images (
+CREATE TABLE IF NOT EXISTS product_images (
     id BIGSERIAL PRIMARY KEY,
     product_id BIGINT NOT NULL CONSTRAINT fk_product_images_product REFERENCES products(id) ON DELETE CASCADE,
     image_url VARCHAR(512) NOT NULL,
@@ -139,7 +141,13 @@ CREATE TABLE orders (
     user_id BIGINT NOT NULL CONSTRAINT fk_orders_user REFERENCES users(id) ON DELETE RESTRICT,
     address_id BIGINT NOT NULL CONSTRAINT fk_orders_address REFERENCES addresses(id) ON DELETE RESTRICT,
     total_amount NUMERIC(12, 2) NOT NULL CONSTRAINT chk_orders_total CHECK (total_amount >= 0),
-    status VARCHAR(30) NOT NULL DEFAULT 'PLACED' CONSTRAINT chk_orders_status CHECK (status IN ('PLACED', 'CONFIRMED', 'PROCESSING', 'SHIPPED', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED')),
+    status VARCHAR(30) NOT NULL DEFAULT 'PLACED' CONSTRAINT chk_orders_status CHECK (status IN ('PLACED', 'CONFIRMED', 'PROCESSING', 'SHIPPED', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED', 'REFUNDED')),
+    carrier VARCHAR(100),
+    tracking_number VARCHAR(100),
+    estimated_delivery_date TIMESTAMP WITH TIME ZONE,
+    shipped_at TIMESTAMP WITH TIME ZONE,
+    delivered_at TIMESTAMP WITH TIME ZONE,
+    delivery_notes VARCHAR(500),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
@@ -164,6 +172,8 @@ CREATE TABLE payments (
     id BIGSERIAL PRIMARY KEY,
     order_id BIGINT NOT NULL CONSTRAINT uk_payments_order UNIQUE CONSTRAINT fk_payments_order REFERENCES orders(id) ON DELETE RESTRICT,
     transaction_id VARCHAR(100) NOT NULL CONSTRAINT uk_payments_transaction UNIQUE,
+    razorpay_order_id VARCHAR(100),
+    razorpay_signature VARCHAR(255),
     amount NUMERIC(12, 2) NOT NULL CONSTRAINT chk_payments_amount CHECK (amount >= 0),
     method VARCHAR(30) NOT NULL CONSTRAINT chk_payments_method CHECK (method IN ('CARD', 'UPI', 'NET_BANKING', 'COD')),
     status VARCHAR(30) NOT NULL DEFAULT 'PENDING' CONSTRAINT chk_payments_status CHECK (status IN ('PENDING', 'SUCCESS', 'FAILED', 'REFUNDED')),
@@ -184,6 +194,33 @@ CREATE TABLE reviews (
     CONSTRAINT uk_user_product_review UNIQUE (user_id, product_id)
 );
 
+-- -----------------------------------------------------------------------------
+-- 14. ORDER STATUS HISTORY TABLE (Audit Trail)
+-- -----------------------------------------------------------------------------
+CREATE TABLE order_status_history (
+    id BIGSERIAL PRIMARY KEY,
+    order_id BIGINT NOT NULL CONSTRAINT fk_order_status_history_order REFERENCES orders(id) ON DELETE CASCADE,
+    status VARCHAR(30) NOT NULL,
+    notes VARCHAR(500),
+    updated_by VARCHAR(100) DEFAULT 'SYSTEM',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+-- -----------------------------------------------------------------------------
+-- 15. EMAIL NOTIFICATION LOGS TABLE (Idempotency & Audit)
+-- -----------------------------------------------------------------------------
+CREATE TABLE email_notification_logs (
+    id BIGSERIAL PRIMARY KEY,
+    recipient_email VARCHAR(100) NOT NULL,
+    notification_type VARCHAR(50) NOT NULL,
+    order_id BIGINT,
+    subject VARCHAR(255) NOT NULL,
+    status VARCHAR(30) NOT NULL DEFAULT 'PENDING' CONSTRAINT chk_email_logs_status CHECK (status IN ('PENDING', 'SENT', 'FAILED', 'SKIPPED')),
+    error_message VARCHAR(1000),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    sent_at TIMESTAMP WITH TIME ZONE
+);
+
 -- =============================================================================
 -- INDEXES FOR QUERY OPTIMIZATION
 -- =============================================================================
@@ -192,6 +229,7 @@ CREATE INDEX idx_users_email ON users(email);
 CREATE INDEX idx_users_role ON users(role);
 CREATE INDEX idx_users_created_at ON users(created_at);
 CREATE INDEX idx_addresses_user_id ON addresses(user_id);
+CREATE INDEX idx_addresses_user_is_default ON addresses(user_id, is_default);
 CREATE INDEX idx_products_category_id ON products(category_id);
 CREATE INDEX idx_products_active_price ON products(active, price);
 CREATE INDEX idx_products_sku ON products(sku);
@@ -201,14 +239,25 @@ CREATE INDEX idx_products_rating ON products(rating);
 CREATE INDEX idx_product_images_product_id ON product_images(product_id);
 CREATE INDEX idx_product_images_prod_primary ON product_images(product_id, is_primary);
 CREATE INDEX idx_cart_items_cart_id ON cart_items(cart_id);
+CREATE INDEX idx_cart_items_product_id ON cart_items(product_id);
 CREATE INDEX idx_wishlist_items_wishlist_id ON wishlist_items(wishlist_id);
+CREATE INDEX idx_wishlist_items_product_id ON wishlist_items(product_id);
 CREATE INDEX idx_orders_user_id ON orders(user_id);
 CREATE INDEX idx_orders_status ON orders(status);
 CREATE INDEX idx_orders_created_at ON orders(created_at);
 CREATE INDEX idx_orders_status_created_at ON orders(status, created_at);
+CREATE INDEX idx_orders_user_status ON orders(user_id, status);
 CREATE INDEX idx_order_items_order_id ON order_items(order_id);
 CREATE INDEX idx_order_items_product_id ON order_items(product_id);
 CREATE INDEX idx_payments_order_id ON payments(order_id);
 CREATE INDEX idx_payments_transaction_id ON payments(transaction_id);
+CREATE INDEX idx_payments_razorpay_order_id ON payments(razorpay_order_id);
 CREATE INDEX idx_reviews_product_id ON reviews(product_id);
 CREATE INDEX idx_reviews_user_id ON reviews(user_id);
+CREATE INDEX idx_orders_tracking_number ON orders(tracking_number);
+CREATE INDEX idx_order_status_history_order_id ON order_status_history(order_id);
+CREATE INDEX idx_order_status_history_created_at ON order_status_history(created_at);
+CREATE INDEX idx_email_logs_order_type ON email_notification_logs(order_id, notification_type);
+CREATE INDEX idx_email_logs_recipient ON email_notification_logs(recipient_email);
+CREATE INDEX idx_email_logs_status ON email_notification_logs(status);
+CREATE INDEX idx_email_logs_created_at ON email_notification_logs(created_at);

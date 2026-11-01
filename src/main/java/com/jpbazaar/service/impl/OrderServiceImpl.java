@@ -2,25 +2,25 @@ package com.jpbazaar.service.impl;
 
 import com.jpbazaar.dto.request.CreateOrderRequest;
 import com.jpbazaar.dto.request.UpdateOrderStatusRequest;
-import com.jpbazaar.dto.response.OrderItemResponse;
-import com.jpbazaar.dto.response.OrderResponse;
-import com.jpbazaar.dto.response.PageResponse;
-import com.jpbazaar.dto.response.PaymentResponse;
+import com.jpbazaar.dto.response.*;
 import com.jpbazaar.entity.*;
+import com.jpbazaar.event.OrderPlacedEvent;
+import com.jpbazaar.event.OrderStatusChangedEvent;
 import com.jpbazaar.exception.*;
 import com.jpbazaar.repository.*;
 import com.jpbazaar.service.OrderService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.CacheManager;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.List;
+import java.time.OffsetDateTime;
+import java.util.*;
 
 @Slf4j
 @Service
@@ -35,6 +35,8 @@ public class OrderServiceImpl implements OrderService {
     private final CartItemRepository cartItemRepository;
     private final ProductRepository productRepository;
     private final PaymentRepository paymentRepository;
+    private final OrderStatusHistoryRepository orderStatusHistoryRepository;
+    private final ApplicationEventPublisher eventPublisher;
     private final jakarta.persistence.EntityManager entityManager;
     private final CacheManager cacheManager;
 
@@ -43,8 +45,9 @@ public class OrderServiceImpl implements OrderService {
     public OrderResponse placeOrder(String userEmail, CreateOrderRequest request) {
         log.info("Processing order placement for user: {}", userEmail);
 
-        User user = userRepository.findByEmail(userEmail)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found with email: " + userEmail));
+        String cleanEmail = userEmail != null ? userEmail.trim() : "";
+        User user = userRepository.findByEmailIgnoreCase(cleanEmail)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with email: " + cleanEmail));
 
         Address address = addressRepository.findByIdAndUserId(request.addressId(), user.getId())
                 .orElseThrow(() -> new InvalidRequestException("Shipping address not found or does not belong to user"));
@@ -61,14 +64,13 @@ public class OrderServiceImpl implements OrderService {
                 .user(user)
                 .address(address)
                 .status(OrderStatus.PLACED)
+                .carrier("JPBazaar White-Glove Express")
                 .totalAmount(BigDecimal.ZERO)
                 .build();
 
-        List<OrderItem> orderItems = new ArrayList<>();
-
         // Sort cart items by productId to enforce deterministic lock acquisition order and prevent deadlocks
         List<CartItem> sortedCartItems = cart.getItems().stream()
-                .sorted(java.util.Comparator.comparing(item -> item.getProduct().getId()))
+                .sorted(Comparator.comparing(item -> item.getProduct().getId()))
                 .toList();
 
         for (CartItem cartItem : sortedCartItems) {
@@ -107,16 +109,18 @@ public class OrderServiceImpl implements OrderService {
                     .subtotal(subtotal)
                     .build();
 
-            orderItems.add(orderItem);
             order.addOrderItem(orderItem);
         }
 
         order.setTotalAmount(totalAmount);
         Order savedOrder = orderRepository.save(order);
 
+        // Generate tracking number
+        savedOrder.setTrackingNumber("JPB-" + savedOrder.getId() + "-" + System.currentTimeMillis() % 1000000);
+
         // Step 10: Create payment record
         PaymentMethod paymentMethod = request.paymentMethod() != null ? request.paymentMethod() : PaymentMethod.COD;
-        String transactionId = "TXN-" + java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 16).toUpperCase();
+        String transactionId = "TXN-" + UUID.randomUUID().toString().replace("-", "").substring(0, 16).toUpperCase();
         Payment payment = Payment.builder()
                 .order(savedOrder)
                 .transactionId(transactionId)
@@ -127,12 +131,27 @@ public class OrderServiceImpl implements OrderService {
         paymentRepository.save(payment);
         savedOrder.setPayment(payment);
 
+        // Record initial status history
+        OrderStatusHistory initialHistory = OrderStatusHistory.builder()
+                .order(savedOrder)
+                .status(OrderStatus.PLACED)
+                .notes("Acquisition order placed by patron")
+                .updatedBy(user.getEmail())
+                .build();
+        savedOrder.addStatusHistory(initialHistory);
+
+        savedOrder = orderRepository.save(savedOrder);
+
         // Step 11: Clear cart items atomically
         cartItemRepository.deleteByCartId(cart.getId());
         cart.clearItems();
 
         log.info("Order successfully placed with ID: {} for user: {}, total: {}, paymentMethod: {}",
                 savedOrder.getId(), userEmail, totalAmount, paymentMethod);
+
+        // Publish OrderPlacedEvent (decoupled, processed after commit)
+        eventPublisher.publishEvent(new OrderPlacedEvent(savedOrder));
+
         return mapToOrderResponse(savedOrder);
     }
 
@@ -151,9 +170,57 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     @Transactional(readOnly = true)
+    public OrderTrackingResponse getOrderTracking(String userEmail, Long orderId, boolean isAdmin) {
+        Order order = orderRepository.findByIdWithDetails(orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Order not found with ID: " + orderId));
+
+        if (!isAdmin && !order.getUser().getEmail().equalsIgnoreCase(userEmail)) {
+            throw new UnauthorizedException("You are not authorized to view tracking for this order");
+        }
+
+        List<OrderStatusHistory> historyEntities = orderStatusHistoryRepository.findByOrderIdOrderByCreatedAtAsc(orderId);
+        List<OrderStatusHistoryResponse> historyResponses = historyEntities.stream()
+                .map(OrderStatusHistoryResponse::fromEntity)
+                .toList();
+
+        List<TrackingCheckpointResponse> checkpoints = buildCheckpoints(order, historyEntities);
+
+        List<OrderItemResponse> itemResponses = mapItemsToResponse(order.getItems());
+
+        String formattedAddress = null;
+        String recipientName = order.getUser() != null
+                ? (order.getUser().getFirstName() + " " + order.getUser().getLastName()).trim()
+                : null;
+        if (order.getAddress() != null) {
+            Address addr = order.getAddress();
+            formattedAddress = addr.getAddressLine() + ", " + addr.getCity() + ", " +
+                    addr.getState() + " " + addr.getPostalCode() + ", " + addr.getCountry();
+        }
+
+        return new OrderTrackingResponse(
+                order.getId(),
+                order.getStatus(),
+                order.getCarrier() != null ? order.getCarrier() : "JPBazaar White-Glove Express",
+                order.getTrackingNumber() != null ? order.getTrackingNumber() : "JPB-" + order.getId() + "-TRK",
+                order.getEstimatedDeliveryDate(),
+                order.getShippedAt(),
+                order.getDeliveredAt(),
+                order.getDeliveryNotes(),
+                order.getTotalAmount(),
+                recipientName,
+                formattedAddress,
+                itemResponses,
+                checkpoints,
+                historyResponses
+        );
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public PageResponse<OrderResponse> getUserOrders(String userEmail, OrderStatus status, Pageable pageable) {
-        User user = userRepository.findByEmail(userEmail)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found with email: " + userEmail));
+        String cleanEmail = userEmail != null ? userEmail.trim() : "";
+        User user = userRepository.findByEmailIgnoreCase(cleanEmail)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with email: " + cleanEmail));
 
         Page<Order> orderPage;
         if (status != null) {
@@ -197,8 +264,41 @@ public class OrderServiceImpl implements OrderService {
         }
 
         order.setStatus(targetStatus);
+
+        // Update tracking attributes if provided
+        if (request.carrier() != null && !request.carrier().isBlank()) {
+            order.setCarrier(request.carrier().trim());
+        }
+        if (request.trackingNumber() != null && !request.trackingNumber().isBlank()) {
+            order.setTrackingNumber(request.trackingNumber().trim());
+        }
+        if (request.estimatedDeliveryDate() != null) {
+            order.setEstimatedDeliveryDate(request.estimatedDeliveryDate());
+        }
+        if (targetStatus == OrderStatus.SHIPPED && order.getShippedAt() == null) {
+            order.setShippedAt(OffsetDateTime.now());
+        }
+        if (targetStatus == OrderStatus.DELIVERED && order.getDeliveredAt() == null) {
+            order.setDeliveredAt(OffsetDateTime.now());
+        }
+
+        String note = request.notes() != null && !request.notes().isBlank()
+                ? request.notes().trim()
+                : "Status transitioned to " + targetStatus;
+
+        OrderStatusHistory history = OrderStatusHistory.builder()
+                .order(order)
+                .status(targetStatus)
+                .notes(note)
+                .updatedBy("ADMIN")
+                .build();
+        order.addStatusHistory(history);
+
         Order updated = orderRepository.save(order);
         log.info("Order ID: {} status updated from {} to {}", orderId, currentStatus, targetStatus);
+
+        // Publish OrderStatusChangedEvent
+        eventPublisher.publishEvent(new OrderStatusChangedEvent(updated, currentStatus, targetStatus, note));
 
         return mapToOrderResponse(updated);
     }
@@ -224,16 +324,98 @@ public class OrderServiceImpl implements OrderService {
         if (order.getPayment() != null && order.getPayment().getStatus() == PaymentStatus.SUCCESS) {
             Payment payment = order.getPayment();
             payment.setStatus(PaymentStatus.REFUNDED);
-            payment.setTransactionId("REF-" + java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 16).toUpperCase());
+            payment.setTransactionId("REF-" + UUID.randomUUID().toString().replace("-", "").substring(0, 16).toUpperCase());
             paymentRepository.save(payment);
             log.info("Order ID: {} payment refunded upon cancellation", orderId);
         }
 
+        OrderStatus previousStatus = order.getStatus();
         order.setStatus(OrderStatus.CANCELLED);
+
+        OrderStatusHistory history = OrderStatusHistory.builder()
+                .order(order)
+                .status(OrderStatus.CANCELLED)
+                .notes("Order cancelled by " + (isAdmin ? "administrator" : "patron"))
+                .updatedBy(userEmail)
+                .build();
+        order.addStatusHistory(history);
+
         Order updated = orderRepository.save(order);
         log.info("Order ID: {} cancelled by user: {}", orderId, userEmail);
 
+        // Publish OrderStatusChangedEvent
+        eventPublisher.publishEvent(new OrderStatusChangedEvent(updated, previousStatus, OrderStatus.CANCELLED, "Order cancelled"));
+
         return mapToOrderResponse(updated);
+    }
+
+    private List<TrackingCheckpointResponse> buildCheckpoints(Order order, List<OrderStatusHistory> history) {
+        OrderStatus current = order.getStatus();
+        Map<OrderStatus, OffsetDateTime> timestampMap = new EnumMap<>(OrderStatus.class);
+        if (history != null) {
+            for (OrderStatusHistory h : history) {
+                timestampMap.putIfAbsent(h.getStatus(), h.getCreatedAt());
+            }
+        }
+
+        if (current == OrderStatus.CANCELLED) {
+            return List.of(
+                    new TrackingCheckpointResponse(1, OrderStatus.PLACED, "Order Placed", "Order was placed", true, false, timestampMap.get(OrderStatus.PLACED)),
+                    new TrackingCheckpointResponse(2, OrderStatus.CANCELLED, "Order Cancelled", "Order was cancelled", true, true, timestampMap.get(OrderStatus.CANCELLED))
+            );
+        }
+
+        List<OrderStatus> standardFlow = List.of(
+                OrderStatus.PLACED,
+                OrderStatus.CONFIRMED,
+                OrderStatus.PROCESSING,
+                OrderStatus.SHIPPED,
+                OrderStatus.OUT_FOR_DELIVERY,
+                OrderStatus.DELIVERED
+        );
+
+        int currentIndex = standardFlow.indexOf(current);
+        if (currentIndex < 0) {
+            currentIndex = standardFlow.size() - 1;
+        }
+
+        List<TrackingCheckpointResponse> list = new ArrayList<>();
+        for (int i = 0; i < standardFlow.size(); i++) {
+            OrderStatus s = standardFlow.get(i);
+            boolean completed = i <= currentIndex;
+            boolean isCurrent = i == currentIndex;
+            String label = getStepLabel(s);
+            String desc = getStepDesc(s);
+            OffsetDateTime ts = timestampMap.get(s);
+            list.add(new TrackingCheckpointResponse(i + 1, s, label, desc, completed, isCurrent, ts));
+        }
+        return list;
+    }
+
+    private String getStepLabel(OrderStatus status) {
+        return switch (status) {
+            case PLACED -> "Order Placed";
+            case CONFIRMED -> "Order Confirmed";
+            case PROCESSING -> "Atelier Preparation";
+            case SHIPPED -> "Dispatched";
+            case OUT_FOR_DELIVERY -> "Out For Delivery";
+            case DELIVERED -> "Delivered";
+            case CANCELLED -> "Cancelled";
+            case REFUNDED -> "Refunded";
+        };
+    }
+
+    private String getStepDesc(OrderStatus status) {
+        return switch (status) {
+            case PLACED -> "Your order was successfully registered";
+            case CONFIRMED -> "Payment verified and acquisition acknowledged";
+            case PROCESSING -> "Item inspection and protective packaging";
+            case SHIPPED -> "Package handed over to logistics carrier";
+            case OUT_FOR_DELIVERY -> "Courier dispatched for arrival";
+            case DELIVERED -> "Consignment delivered to client destination";
+            case CANCELLED -> "Order has been cancelled";
+            case REFUNDED -> "Settlement refunded to original payment method";
+        };
     }
 
     private void restoreInventory(Order order) {
@@ -251,8 +433,11 @@ public class OrderServiceImpl implements OrderService {
         }
     }
 
-    private OrderResponse mapToOrderResponse(Order order) {
-        List<OrderItemResponse> itemResponses = order.getItems().stream().map(item -> {
+    private List<OrderItemResponse> mapItemsToResponse(List<OrderItem> items) {
+        if (items == null) {
+            return Collections.emptyList();
+        }
+        return items.stream().map(item -> {
             String imageUrl = null;
             Product product = item.getProduct();
             if (product != null && product.getImages() != null && !product.getImages().isEmpty()) {
@@ -272,7 +457,10 @@ public class OrderServiceImpl implements OrderService {
                     imageUrl
             );
         }).toList();
+    }
 
+    private OrderResponse mapToOrderResponse(Order order) {
+        List<OrderItemResponse> itemResponses = mapItemsToResponse(order.getItems());
         int totalItemCount = order.getItems().stream().mapToInt(OrderItem::getQuantity).sum();
 
         String formattedAddress = null;

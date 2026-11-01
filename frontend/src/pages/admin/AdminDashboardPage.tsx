@@ -16,6 +16,7 @@ import { ProductModal } from '../../components/admin/ProductModal';
 import { CategoryModal } from '../../components/admin/CategoryModal';
 import { ProductImageModal } from '../../components/admin/ProductImageModal';
 import { BulkImportView } from '../../components/admin/BulkImportView';
+import { OrderTrackingModal } from '../../components/admin/OrderTrackingModal';
 import { Button } from '../../components/common/Button';
 import { Badge } from '../../components/common/Badge';
 import { Input } from '../../components/common/Input';
@@ -38,6 +39,7 @@ import {
   RotateCcw,
   Image as ImageIcon,
   FileSpreadsheet,
+  Truck,
 } from 'lucide-react';
 
 export const AdminDashboardPage: React.FC = () => {
@@ -79,6 +81,8 @@ export const AdminDashboardPage: React.FC = () => {
   const [orderPage, setOrderPage] = useState(0);
   const [isLoadingOrders, setIsLoadingOrders] = useState(false);
   const [updatingOrderId, setUpdatingOrderId] = useState<number | null>(null);
+  const [trackingModalOrder, setTrackingModalOrder] = useState<Order | null>(null);
+  const [isTrackingModalOpen, setIsTrackingModalOpen] = useState(false);
 
   // Load Overview Stats
   const fetchStats = useCallback(async () => {
@@ -916,6 +920,7 @@ export const AdminDashboardPage: React.FC = () => {
                     <th className="p-4">Total</th>
                     <th className="p-4">Current Status</th>
                     <th className="p-4">State Transition</th>
+                    <th className="p-4">Logistics</th>
                     <th className="p-4">Date</th>
                   </tr>
                 </thead>
@@ -930,7 +935,7 @@ export const AdminDashboardPage: React.FC = () => {
                           <span className="text-[10px] text-luxury-muted truncate block max-w-xs">{ord.shippingAddress}</span>
                         </td>
                         <td className="p-4 font-serif font-bold text-luxury-gold">
-                          ${Number(ord.totalAmount).toFixed(2)}
+                          ₹{Number(ord.totalAmount).toFixed(2)}
                         </td>
                         <td className="p-4">
                           <Badge variant="dark" className="border-luxury-gold/30 text-luxury-gold font-bold">
@@ -938,7 +943,7 @@ export const AdminDashboardPage: React.FC = () => {
                           </Badge>
                         </td>
                         <td className="p-4">
-                          {ord.status !== 'DELIVERED' && ord.status !== 'CANCELLED' ? (
+                          {ord.status !== 'DELIVERED' && ord.status !== 'CANCELLED' && ord.status !== 'REFUNDED' ? (
                             <select
                               disabled={isUpdating}
                               value={ord.status}
@@ -962,6 +967,28 @@ export const AdminDashboardPage: React.FC = () => {
                           ) : (
                             <span className="text-[11px] text-luxury-muted italic">Terminal Lifecycle State</span>
                           )}
+                        </td>
+                        <td className="p-4">
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => {
+                                setTrackingModalOrder(ord);
+                                setIsTrackingModalOpen(true);
+                              }}
+                              className="px-2 py-1 bg-luxury-surface border border-luxury-border rounded text-[11px] font-semibold text-luxury-gold hover:bg-luxury-elevated transition-colors flex items-center gap-1"
+                              title="Update Logistics & Tracking"
+                            >
+                              <Truck size={12} />
+                              <span>Dispatch</span>
+                            </button>
+                            <Link
+                              to={`/account/orders/${ord.id}/track`}
+                              className="p-1 text-luxury-muted hover:text-luxury-white transition-colors"
+                              title="View Live Client Tracking Stepper"
+                            >
+                              <ExternalLink size={13} />
+                            </Link>
+                          </div>
                         </td>
                         <td className="p-4 text-luxury-muted">
                           {new Date(ord.createdAt).toLocaleDateString()}
@@ -1057,6 +1084,26 @@ export const AdminDashboardPage: React.FC = () => {
           fetchStats();
         }}
         categoryToEdit={categoryToEdit}
+      />
+
+      {/* Order Tracking & Logistics Modal */}
+      <OrderTrackingModal
+        isOpen={isTrackingModalOpen}
+        onClose={() => {
+          setIsTrackingModalOpen(false);
+          setTrackingModalOrder(null);
+        }}
+        order={trackingModalOrder}
+        onSuccess={(updated) => {
+          setOrdersData((prev) => {
+            if (!prev) return null;
+            return {
+              ...prev,
+              content: prev.content.map((o) => (o.id === updated.id ? updated : o)),
+            };
+          });
+          fetchStats();
+        }}
       />
     </div>
   );

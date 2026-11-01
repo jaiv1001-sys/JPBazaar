@@ -44,8 +44,9 @@ public class ReviewServiceImpl implements ReviewService {
     public ReviewResponse addReview(String userEmail, ReviewRequest request) {
         log.info("Adding review for product ID: {} by user: {}", request.productId(), userEmail);
 
-        User user = userRepository.findByEmail(userEmail)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found with email: " + userEmail));
+        String cleanEmail = userEmail != null ? userEmail.trim() : "";
+        User user = userRepository.findByEmailIgnoreCase(cleanEmail)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with email: " + cleanEmail));
 
         Product product = productRepository.findById(request.productId())
                 .orElseThrow(() -> new ResourceNotFoundException("Product not found with ID: " + request.productId()));
